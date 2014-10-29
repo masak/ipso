@@ -73,6 +73,10 @@ class X::EmptyListEvaluated is Exception {
     method message { "Empty list () evaluated" }
 }
 
+class X::UnsatisfiedCond is Exception {
+    method message { "Fell through all expressions in cond" }
+}
+
 sub eval($expr, %env) {
     sub atom($expr) { $expr eqv [] || $expr !~~ Array }
     sub eq($e1, $e2) {
@@ -88,6 +92,8 @@ sub eval($expr, %env) {
     sub caddar(@list) { car cdr cdr car @list }
     sub cons($head, @tail) { [$head, @tail] }
     sub evcon(@list, %env) {
+        die X::UnsatisfiedCond.new
+            unless @list;
         return eval(caar(@list), %env) eq 't'
             ?? eval(cadar(@list), %env)
             !! evcon(cdr(@list), %env);
