@@ -8,6 +8,11 @@ grammar Lisp::Syntax {
     regex term { \w+ }
 }
 
+class X::NoSuchSymbol is Exception {
+    has $.symbol;
+    method message { "No such symbol '$.symbol' defined" }
+}
+
 sub lisp($input) is export {
     my $actions = class {
         method TOP($/) { make $<value>.ast }
@@ -57,6 +62,8 @@ sub lisp($input) is export {
         }
 
         if atom($expr) {
+            die X::NoSuchSymbol.new(:symbol($expr))
+                unless %env{$expr}:exists;
             return %env{$expr};
         }
         elsif atom(car($expr)) {
@@ -69,6 +76,8 @@ sub lisp($input) is export {
                 when 'cons' { cons(eval(cadr($expr), %env), eval(caddr($expr), %env)) }
                 when 'cond' { evcon(cdr($expr), %env) }
                 default { # function application
+                    die X::NoSuchSymbol.new(:symbol(car($expr)))
+                        unless %env{car($expr)}:exists;
                     eval(cons(%env{car($expr)}, cdr($expr)), %env)
                 }
             }
