@@ -43,6 +43,7 @@ sub lisp($input) is export {
                 when 'atom' { return atom(eval(cadr($expr))) ?? 't' !! [] }
                 when 'eq' { return eq(eval(cadr($expr)), eval(caddr($expr))) ?? 't' !! [] }
                 when 'car' { return car(eval(cadr($expr))) }
+                when 'cdr' { return cdr(eval(cadr($expr))) }
             }
             die "didn't cover the other special forms, like ‹$input›: $ast.perl()";
         }
