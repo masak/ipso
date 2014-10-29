@@ -17,6 +17,9 @@ is lisp(q[(cdadr '(((a b) c d) (e F) g h))]), q[(F)], "cdadr";
 is lisp(q[(caddr '(((a b) c d) (e f) G h))]), q[G], "caddr";
 is lisp(q[(cdddr '(((a b) c d) (e f) g H))]), q[(H)], "cdddr";
 
+# dangit, can't be bothered to add them all. but caddar is used by eval
+is lisp(q[(caddar '((a b C) d))]), q[C], "caddar";
+
 is lisp(q[(null 'a)]), q[()], "this is not the empty list";
 is lisp(q[(null '())]), q[t], "this is";
 

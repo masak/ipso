@@ -36,6 +36,7 @@ my %SETTING =
     cdadr => parse(q[(lambda (x) (cdr (car (cdr x))))]),
     caddr => parse(q[(lambda (x) (car (cdr (cdr x))))]),
     cdddr => parse(q[(lambda (x) (cdr (cdr (cdr x))))]),
+    caddar => parse(q[(lambda (x) (car (cdr (cdr (car x)))))]),
     null => parse(q[
         (lambda (x)
           (eq x '()))]),
