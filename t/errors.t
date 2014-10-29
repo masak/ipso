@@ -3,5 +3,6 @@ use Test;
 
 throws_like { lisp(q[foo]) }, X::NoSuchSymbol;
 throws_like { lisp(q[(foo 'x)]) }, X::NoSuchSymbol;
+throws_like { lisp(q[()]) }, X::EmptyListEvaluated;
 
 done;
