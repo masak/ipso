@@ -4,7 +4,7 @@ grammar Lisp::Syntax {
     regex TOP { <value> }
     regex value { <quote>? [<list> | <term>] }
     regex quote { "'" }
-    regex list { '(' <value>* % \h ')' }
+    regex list { '(' ~ ')' [<value>* % \h] }
     regex term { \w+ }
 }
 
@@ -25,21 +25,23 @@ sub lisp($input) is export {
 
     sub eval($expr) {
         sub atom($expr) { $expr eqv [] || $expr !~~ Array }
+        sub eq($e1, $e2) {
+            $e1 eqv [] && $e2 eqv []
+            || $e1 !~~ Array && $e2 !~~ Array && $e1 eq $e2
+        }
         sub car([$head, *@tail]) { $head }
         sub cdr([$head, *@tail]) { @tail }
         sub cadr(@list) { car cdr @list }
+        sub caddr(@list) { car cdr cdr @list }
 
         if atom($expr) {
             die "not handling the case of atom lookup yet";
         }
         elsif atom(car($expr)) {
             given car($expr) {
-                when 'quote' {
-                    return cadr($expr);
-                }
-                when 'atom' {
-                    return atom(eval(cadr($expr))) ?? 't' !! '()';
-                }
+                when 'quote' { return cadr($expr) }
+                when 'atom' { return atom(eval(cadr($expr))) ?? 't' !! [] }
+                when 'eq' { return eq(eval(cadr($expr)), eval(caddr($expr))) ?? 't' !! [] }
             }
             die "didn't cover the other special forms, like ‹$input›: $ast.perl()";
         }
