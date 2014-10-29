@@ -73,15 +73,15 @@ sub lisp($input) is export {
                 }
             }
         }
+        elsif eq(caar($expr), 'label') {
+            return eval(cons(caddar($expr), cdr($expr)), extend([[cadar($expr), car($expr)]], %env));
+        }
         elsif eq(caar($expr), 'lambda') {
             return eval(caddar($expr), extend(pair(cadar($expr), evlis(cdr($expr), %env)), %env));
-        }
-        else {
-            die "didn't cover the case of ‹$input›: $ast.perl()";
         }
     }
 
     sub repr($expr) {
-        return $expr ~~ Array ?? "({$expr.join(" ")})" !! $expr;
+        return $expr ~~ Array ?? "({$expr.map(&repr).join(" ")})" !! $expr;
     }
 }
