@@ -1,10 +1,10 @@
 use v6;
 
 grammar Lisp::Syntax {
-    regex TOP { <value> }
-    regex value { <quote>? [<list> | <term>] }
+    regex TOP { <value> \s* }
+    regex value { \s* <quote>? [<list> | <term>] }
     regex quote { "'" }
-    regex list { '(' ~ ')' [<value>* % \h] }
+    regex list { '(' ~ ')' [<value>* %% \s*] }
     regex term { \w+ }
 }
 
@@ -31,9 +31,16 @@ sub lisp($input) is export {
         }
         sub car([$head, *@tail]) { $head }
         sub cdr([$head, *@tail]) { @tail }
+        sub caar(@list) { car car @list }
         sub cadr(@list) { car cdr @list }
+        sub cadar(@list) { car cdr car @list }
         sub caddr(@list) { car cdr cdr @list }
         sub cons($head, @tail) { [$head, @tail] }
+        sub evcon(@list) {
+            return eval(caar(@list)) eq 't'
+                ?? eval(cadar(@list))
+                !! evcon(cdr(@list));
+        }
 
         if atom($expr) {
             die "not handling the case of atom lookup yet";
@@ -46,6 +53,7 @@ sub lisp($input) is export {
                 when 'car' { return car(eval(cadr($expr))) }
                 when 'cdr' { return cdr(eval(cadr($expr))) }
                 when 'cons' { return cons(eval(cadr($expr)), eval(caddr($expr))) }
+                when 'cond' { return evcon(cdr($expr)) }
             }
             die "didn't cover the other special forms, like ‹$input›: $ast.perl()";
         }
