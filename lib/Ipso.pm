@@ -21,9 +21,9 @@ sub lisp($input) is export {
     Lisp::Syntax.parse($input, :$actions)
         or die "Could not parse ‹$input›";
     my $ast = $/.ast;
-    return repr(eval($ast));
+    return repr(eval($ast, {}));
 
-    sub eval($expr) {
+    sub eval($expr, %env) {
         sub atom($expr) { $expr eqv [] || $expr !~~ Array }
         sub eq($e1, $e2) {
             $e1 eqv [] && $e2 eqv []
@@ -35,27 +35,46 @@ sub lisp($input) is export {
         sub cadr(@list) { car cdr @list }
         sub cadar(@list) { car cdr car @list }
         sub caddr(@list) { car cdr cdr @list }
+        sub caddar(@list) { car cdr cdr car @list }
         sub cons($head, @tail) { [$head, @tail] }
-        sub evcon(@list) {
-            return eval(caar(@list)) eq 't'
-                ?? eval(cadar(@list))
-                !! evcon(cdr(@list));
+        sub evcon(@list, %env) {
+            return eval(caar(@list), %env) eq 't'
+                ?? eval(cadar(@list), %env)
+                !! evcon(cdr(@list), %env);
+        }
+        sub evlis(@list, %env) {
+            [@list.map({ eval($_, %env).item })]
+        }
+        sub pair(@l1, @l2) {
+            [(@l1 Z @l2).map({ [$^e1, $^e2] })]
+        }
+        sub extend(@pairs, %old) {
+            my %new = %old;
+            for @pairs -> [$k, $v] {
+                %new{$k} = $v;
+            }
+            %new;
         }
 
         if atom($expr) {
-            die "not handling the case of atom lookup yet";
+            return %env{$expr};
         }
         elsif atom(car($expr)) {
-            given car($expr) {
-                when 'quote' { return cadr($expr) }
-                when 'atom' { return atom(eval(cadr($expr))) ?? 't' !! [] }
-                when 'eq' { return eq(eval(cadr($expr)), eval(caddr($expr))) ?? 't' !! [] }
-                when 'car' { return car(eval(cadr($expr))) }
-                when 'cdr' { return cdr(eval(cadr($expr))) }
-                when 'cons' { return cons(eval(cadr($expr)), eval(caddr($expr))) }
-                when 'cond' { return evcon(cdr($expr)) }
+            return do given car($expr) {
+                when 'quote' { cadr($expr) }
+                when 'atom' { atom(eval(cadr($expr), %env)) ?? 't' !! [] }
+                when 'eq' { eq(eval(cadr($expr), %env), eval(caddr($expr), %env)) ?? 't' !! [] }
+                when 'car' { car(eval(cadr($expr), %env)) }
+                when 'cdr' { cdr(eval(cadr($expr), %env)) }
+                when 'cons' { cons(eval(cadr($expr), %env), eval(caddr($expr), %env)) }
+                when 'cond' { evcon(cdr($expr), %env) }
+                default { # function application
+                    eval(cons(%env{car($expr)}, cdr($expr)), %env)
+                }
             }
-            die "didn't cover the other special forms, like ‹$input›: $ast.perl()";
+        }
+        elsif eq(caar($expr), 'lambda') {
+            return eval(caddar($expr), extend(pair(cadar($expr), evlis(cdr($expr), %env)), %env));
         }
         else {
             die "didn't cover the case of ‹$input›: $ast.perl()";
