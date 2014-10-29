@@ -77,14 +77,20 @@ class X::UnsatisfiedCond is Exception {
     method message { "Fell through all expressions in cond" }
 }
 
+class X::IndexIntoEmptyList is Exception {
+    method message { "Tried to look into empty list ()" }
+}
+
 sub eval($expr, %env) {
     sub atom($expr) { $expr eqv [] || $expr !~~ Array }
     sub eq($e1, $e2) {
         $e1 eqv [] && $e2 eqv []
         || $e1 !~~ Array && $e2 !~~ Array && $e1 eq $e2
     }
-    sub car([$head, *@tail]) { $head }
-    sub cdr([$head, *@tail]) { @tail }
+    multi car([]) { die X::IndexIntoEmptyList.new }
+    multi car([$head, *@tail]) { $head }
+    multi cdr([]) { die X::IndexIntoEmptyList.new }
+    multi cdr([$head, *@tail]) { @tail }
     sub caar(@list) { car car @list }
     sub cadr(@list) { car cdr @list }
     sub cadar(@list) { car cdr car @list }
