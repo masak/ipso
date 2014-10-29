@@ -33,6 +33,7 @@ sub lisp($input) is export {
         sub cdr([$head, *@tail]) { @tail }
         sub cadr(@list) { car cdr @list }
         sub caddr(@list) { car cdr cdr @list }
+        sub cons($head, @tail) { [$head, @tail] }
 
         if atom($expr) {
             die "not handling the case of atom lookup yet";
@@ -44,6 +45,7 @@ sub lisp($input) is export {
                 when 'eq' { return eq(eval(cadr($expr)), eval(caddr($expr))) ?? 't' !! [] }
                 when 'car' { return car(eval(cadr($expr))) }
                 when 'cdr' { return cdr(eval(cadr($expr))) }
+                when 'cons' { return cons(eval(cadr($expr)), eval(caddr($expr))) }
             }
             die "didn't cover the other special forms, like ‹$input›: $ast.perl()";
         }
