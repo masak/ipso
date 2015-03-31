@@ -44,8 +44,7 @@ my %SETTING =
         (lambda (x y)
           (cond (x (cond (y 't) ('t '())))
                 ('t '())))]),
-    # RAKUDO: Can't use 'not' as a bare key in hashes [RT #123084]
-    'not' => parse(q[
+    not => parse(q[
         (lambda (x)
           (cond (x '())
                 ('t 't)))]),
