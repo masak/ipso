@@ -1,3 +1,5 @@
+_Res ipsa loquitur_ &mdash; Latin, meaning "the thing speaks for itself"
+
 Largely following the steps noted down in pg's
 [The Roots of Lisp](http://lib.store.yahoo.net/lib/paulgraham/jmc.ps).
 Blissfully ignoring the admonitions in
