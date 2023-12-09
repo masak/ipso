@@ -347,3 +347,38 @@ function is(expected: Value, actual: Value, message: string): void {
     let actual = reduceFully(load(expr));
     is(expected, actual, "(atom '())");
 }
+
+{
+    let expr = new ExprList([
+        new ExprSymbol("atom"),
+        new ExprList([
+            new ExprSymbol("atom"),
+            new ExprList([
+                new ExprSymbol("quote"),
+                new ExprSymbol("a"),
+            ]),
+        ]),
+    ]);
+    let expected = new ValueSymbol("t");
+    let actual = reduceFully(load(expr));
+    is(expected, actual, "(atom (atom 'a))");
+}
+
+{
+    let expr = new ExprList([
+        new ExprSymbol("atom"),
+        new ExprList([
+            new ExprSymbol("quote"),
+            new ExprList([
+                new ExprSymbol("atom"),
+                new ExprList([
+                    new ExprSymbol("quote"),
+                    new ExprSymbol("a"),
+                ]),
+            ]),
+        ]),
+    ]);
+    let expected = new ValueEmptyList();
+    let actual = reduceFully(load(expr));
+    is(expected, actual, "(atom '(atom 'a))");
+}
