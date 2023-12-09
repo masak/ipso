@@ -85,6 +85,8 @@ export type Kont = PKont | RetKont;
 
 export type PKont =
     | KontAtom
+    | KontEq1
+    | KontEq2
     | KontSucceed;
 
 export type RetKont =
@@ -92,6 +94,16 @@ export type RetKont =
 
 export class KontAtom {
     constructor(public tail: Kont) {
+    }
+}
+
+export class KontEq1 {
+    constructor(public operand2: Expr, public env: Env, public tail: Kont) {
+    }
+}
+
+export class KontEq2 {
+    constructor(public argument1: Value, public tail: Kont) {
     }
 }
 
@@ -182,7 +194,20 @@ function handleSymbolOperator(operator: ExprSymbol, operands: Array<Expr>, state
             operands[0],
             state.env,
             new KontAtom(state.kont),
-        )
+        );
+    }
+    else if (operator.name === "eq") {
+        if (operands.length < 2) {
+            throw new Error("'eq' with too few operands");
+        }
+        else if (operands.length > 2) {
+            throw new Error("'eq' with too many operands");
+        }
+        return new PState(
+            operands[0],
+            state.env,
+            new KontEq1(operands[1], state.env, state.kont),
+        );
     }
     else {
         throw new Error(`Unknown operator ${operator.toString()}`);
@@ -225,6 +250,22 @@ function reduceRetState(state: RetState): State {
     let kont = retKont.tail;
     if (kont instanceof KontAtom) {
         let retValue = value instanceof ValueSymbol || value instanceof ValueEmptyList
+            ? new ValueSymbol("t")
+            : new ValueEmptyList();
+        return new RetState(new KontRetValue(retValue, kont.tail));
+    }
+    else if (kont instanceof KontEq1) {
+        return new PState(kont.operand2, kont.env, new KontEq2(
+            value,
+            kont.tail,
+        ));
+    }
+    else if (kont instanceof KontEq2) {
+        let arg1 = kont.argument1;
+        let isSameSymbol = value instanceof ValueSymbol && arg1 instanceof ValueSymbol &&
+            value.name === arg1.name;
+        let isSameEmptyList = value instanceof ValueEmptyList && arg1 instanceof ValueEmptyList;
+        let retValue = isSameSymbol || isSameEmptyList
             ? new ValueSymbol("t")
             : new ValueEmptyList();
         return new RetState(new KontRetValue(retValue, kont.tail));
@@ -381,4 +422,55 @@ function is(expected: Value, actual: Value, message: string): void {
     let expected = new ValueEmptyList();
     let actual = reduceFully(load(expr));
     is(expected, actual, "(atom '(atom 'a))");
+}
+
+{
+    let expr = new ExprList([
+        new ExprSymbol("eq"),
+        new ExprList([
+            new ExprSymbol("quote"),
+            new ExprSymbol("a"),
+        ]),
+        new ExprList([
+            new ExprSymbol("quote"),
+            new ExprSymbol("a"),
+        ]),
+    ]);
+    let expected = new ValueSymbol("t");
+    let actual = reduceFully(load(expr));
+    is(expected, actual, "(eq 'a 'a)");
+}
+
+{
+    let expr = new ExprList([
+        new ExprSymbol("eq"),
+        new ExprList([
+            new ExprSymbol("quote"),
+            new ExprSymbol("a"),
+        ]),
+        new ExprList([
+            new ExprSymbol("quote"),
+            new ExprSymbol("b"),
+        ]),
+    ]);
+    let expected = new ValueEmptyList();
+    let actual = reduceFully(load(expr));
+    is(expected, actual, "(eq 'a 'b)");
+}
+
+{
+    let expr = new ExprList([
+        new ExprSymbol("eq"),
+        new ExprList([
+            new ExprSymbol("quote"),
+            new ExprList([]),
+        ]),
+        new ExprList([
+            new ExprSymbol("quote"),
+            new ExprList([]),
+        ]),
+    ]);
+    let expected = new ValueSymbol("t");
+    let actual = reduceFully(load(expr));
+    is(expected, actual, "(eq '() '())");
 }
