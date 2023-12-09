@@ -172,24 +172,25 @@ function reduceOne(state: State): State {
     }
 }
 
+function assertOperandCount(name: string, operands: Array<Expr>, min: number, max: number): void {
+    if (operands.length < min) {
+        throw new Error(operands.length === 0
+            ? `'${name}' without operand`
+            : `'${name}' with too few operands`);
+    }
+    else if (operands.length > max) {
+        throw new Error(`'${name}' with too many operands`);
+    }
+}
+
 function handleSymbolOperator(operator: ExprSymbol, operands: Array<Expr>, state: PState): State {
     if (operator.name === "quote") {
-        if (operands.length === 0) {
-            throw new Error("'quote' without operand");
-        }
-        else if (operands.length > 1) {
-            throw new Error("'quote' with too many operands");
-        }
+        assertOperandCount("quote", operands, 1, 1);
         let value = quoteExpr(operands[0]);
         return new RetState(new KontRetValue(value, state.kont));
     }
     else if (operator.name === "atom") {
-        if (operands.length === 0) {
-            throw new Error("'atom' without operand");
-        }
-        else if (operands.length > 1) {
-            throw new Error("'atom' with too many operands");
-        }
+        assertOperandCount("atom", operands, 1, 1);
         return new PState(
             operands[0],
             state.env,
@@ -197,12 +198,7 @@ function handleSymbolOperator(operator: ExprSymbol, operands: Array<Expr>, state
         );
     }
     else if (operator.name === "eq") {
-        if (operands.length < 2) {
-            throw new Error("'eq' with too few operands");
-        }
-        else if (operands.length > 2) {
-            throw new Error("'eq' with too many operands");
-        }
+        assertOperandCount("eq", operands, 2, 2);
         return new PState(
             operands[0],
             state.env,
