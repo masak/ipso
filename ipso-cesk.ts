@@ -224,7 +224,7 @@ function reduceRetState(state: RetState): State {
     let value = retKont.value;
     let kont = retKont.tail;
     if (kont instanceof KontAtom) {
-        let retValue = value instanceof ValueSymbol
+        let retValue = value instanceof ValueSymbol || value instanceof ValueEmptyList
             ? new ValueSymbol("t")
             : new ValueEmptyList();
         return new RetState(new KontRetValue(retValue, kont.tail));
