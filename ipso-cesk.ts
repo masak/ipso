@@ -85,6 +85,7 @@ export type Kont = PKont | RetKont;
 
 export type PKont =
     | KontAtom
+    | KontCar
     | KontEq1
     | KontEq2
     | KontSucceed;
@@ -93,6 +94,11 @@ export type RetKont =
     | KontRetValue;
 
 export class KontAtom {
+    constructor(public tail: Kont) {
+    }
+}
+
+export class KontCar {
     constructor(public tail: Kont) {
     }
 }
@@ -197,6 +203,14 @@ function handleSymbolOperator(operator: ExprSymbol, operands: Array<Expr>, state
             new KontAtom(state.kont),
         );
     }
+    else if (operator.name === "car") {
+        assertOperandCount("car", operands, 1, 1);
+        return new PState(
+            operands[0],
+            state.env,
+            new KontCar(state.kont),
+        );
+    }
     else if (operator.name === "eq") {
         assertOperandCount("eq", operands, 2, 2);
         return new PState(
@@ -248,6 +262,13 @@ function reduceRetState(state: RetState): State {
         let retValue = value instanceof ValueSymbol || value instanceof ValueEmptyList
             ? new ValueSymbol("t")
             : new ValueEmptyList();
+        return new RetState(new KontRetValue(retValue, kont.tail));
+    }
+    else if (kont instanceof KontCar) {
+        if (!(value instanceof ValuePair)) {
+            throw new Error("Can't 'car' on a non-pair");
+        }
+        let retValue = value.car;
         return new RetState(new KontRetValue(retValue, kont.tail));
     }
     else if (kont instanceof KontEq1) {
@@ -469,4 +490,21 @@ function is(expected: Value, actual: Value, message: string): void {
     let expected = new ValueSymbol("t");
     let actual = reduceFully(load(expr));
     is(expected, actual, "(eq '() '())");
+}
+
+{
+    let expr = new ExprList([
+        new ExprSymbol("car"),
+        new ExprList([
+            new ExprSymbol("quote"),
+            new ExprList([
+                new ExprSymbol("a"),
+                new ExprSymbol("b"),
+                new ExprSymbol("c"),
+            ]),
+        ]),
+    ]);
+    let expected = new ValueSymbol("a");
+    let actual = reduceFully(load(expr));
+    is(expected, actual, "(car '(a b c))");
 }
