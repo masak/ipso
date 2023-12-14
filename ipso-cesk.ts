@@ -86,6 +86,7 @@ export type Kont = PKont | RetKont;
 export type PKont =
     | KontAtom
     | KontCar
+    | KontCdr
     | KontEq1
     | KontEq2
     | KontSucceed;
@@ -99,6 +100,11 @@ export class KontAtom {
 }
 
 export class KontCar {
+    constructor(public tail: Kont) {
+    }
+}
+
+export class KontCdr {
     constructor(public tail: Kont) {
     }
 }
@@ -211,6 +217,14 @@ function handleSymbolOperator(operator: ExprSymbol, operands: Array<Expr>, state
             new KontCar(state.kont),
         );
     }
+    else if (operator.name === "cdr") {
+        assertOperandCount("cdr", operands, 1, 1);
+        return new PState(
+            operands[0],
+            state.env,
+            new KontCdr(state.kont),
+        );
+    }
     else if (operator.name === "eq") {
         assertOperandCount("eq", operands, 2, 2);
         return new PState(
@@ -269,6 +283,13 @@ function reduceRetState(state: RetState): State {
             throw new Error("Can't 'car' on a non-pair");
         }
         let retValue = value.car;
+        return new RetState(new KontRetValue(retValue, kont.tail));
+    }
+    else if (kont instanceof KontCdr) {
+        if (!(value instanceof ValuePair)) {
+            throw new Error("Can't 'cdr' on a non-pair");
+        }
+        let retValue = value.cdr;
         return new RetState(new KontRetValue(retValue, kont.tail));
     }
     else if (kont instanceof KontEq1) {
@@ -507,4 +528,27 @@ function is(expected: Value, actual: Value, message: string): void {
     let expected = new ValueSymbol("a");
     let actual = reduceFully(load(expr));
     is(expected, actual, "(car '(a b c))");
+}
+
+{
+    let expr = new ExprList([
+        new ExprSymbol("cdr"),
+        new ExprList([
+            new ExprSymbol("quote"),
+            new ExprList([
+                new ExprSymbol("a"),
+                new ExprSymbol("b"),
+                new ExprSymbol("c"),
+            ]),
+        ]),
+    ]);
+    let expected = new ValuePair(
+        new ValueSymbol("b"),
+        new ValuePair(
+            new ValueSymbol("c"),
+            new ValueEmptyList(),
+        ),
+    );
+    let actual = reduceFully(load(expr));
+    is(expected, actual, "(cdr '(a b c))");
 }
