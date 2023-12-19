@@ -87,6 +87,8 @@ export type PKont =
     | KontAtom
     | KontCar
     | KontCdr
+    | KontCons1
+    | KontCons2
     | KontEq1
     | KontEq2
     | KontSucceed;
@@ -106,6 +108,16 @@ export class KontCar {
 
 export class KontCdr {
     constructor(public tail: Kont) {
+    }
+}
+
+export class KontCons1 {
+    constructor(public operand2: Expr, public env: Env, public tail: Kont) {
+    }
+}
+
+export class KontCons2 {
+    constructor(public argument1: Value, public tail: Kont) {
     }
 }
 
@@ -225,6 +237,14 @@ function handleSymbolOperator(operator: ExprSymbol, operands: Array<Expr>, state
             new KontCdr(state.kont),
         );
     }
+    else if (operator.name === "cons") {
+        assertOperandCount("cons", operands, 2, 2);
+        return new PState(
+            operands[0],
+            state.env,
+            new KontCons1(operands[1], state.env, state.kont),
+        )
+    }
     else if (operator.name === "eq") {
         assertOperandCount("eq", operands, 2, 2);
         return new PState(
@@ -290,6 +310,17 @@ function reduceRetState(state: RetState): State {
             throw new Error("Can't 'cdr' on a non-pair");
         }
         let retValue = value.cdr;
+        return new RetState(new KontRetValue(retValue, kont.tail));
+    }
+    else if (kont instanceof KontCons1) {
+        return new PState(kont.operand2, kont.env, new KontCons2(
+            value,
+            kont.tail,
+        ));
+    }
+    else if (kont instanceof KontCons2) {
+        let arg1 = kont.argument1;
+        let retValue = new ValuePair(arg1, value);
         return new RetState(new KontRetValue(retValue, kont.tail));
     }
     else if (kont instanceof KontEq1) {
@@ -551,4 +582,125 @@ function is(expected: Value, actual: Value, message: string): void {
     );
     let actual = reduceFully(load(expr));
     is(expected, actual, "(cdr '(a b c))");
+}
+
+{
+    let expr = new ExprList([
+        new ExprSymbol("cons"),
+        new ExprList([
+            new ExprSymbol("quote"),
+            new ExprSymbol("a"),
+        ]),
+        new ExprList([
+            new ExprSymbol("quote"),
+            new ExprList([
+                new ExprSymbol("b"),
+                new ExprSymbol("c"),
+            ]),
+        ]),
+    ]);
+    let expected = new ValuePair(
+        new ValueSymbol("a"),
+        new ValuePair(
+            new ValueSymbol("b"),
+            new ValuePair(
+                new ValueSymbol("c"),
+                new ValueEmptyList(),
+            ),
+        ),
+    );
+    let actual = reduceFully(load(expr));
+    is(expected, actual, "(cons 'a '(b c))");
+}
+
+{
+    let expr = new ExprList([
+        new ExprSymbol("cons"),
+        new ExprList([
+            new ExprSymbol("quote"),
+            new ExprSymbol("a"),
+        ]),
+        new ExprList([
+            new ExprSymbol("cons"),
+            new ExprList([
+                new ExprSymbol("quote"),
+                new ExprSymbol("b"),
+            ]),
+            new ExprList([
+                new ExprSymbol("cons"),
+                new ExprList([
+                    new ExprSymbol("quote"),
+                    new ExprSymbol("c"),
+                ]),
+                new ExprList([
+                    new ExprSymbol("quote"),
+                    new ExprList([]),
+                ]),
+            ]),
+        ]),
+    ]);
+    let expected = new ValuePair(
+        new ValueSymbol("a"),
+        new ValuePair(
+            new ValueSymbol("b"),
+            new ValuePair(
+                new ValueSymbol("c"),
+                new ValueEmptyList(),
+            ),
+        ),
+    );
+    let actual = reduceFully(load(expr));
+    is(expected, actual, "(cons 'a (cons 'b (cons 'c '())))");
+}
+
+{
+    let expr = new ExprList([
+        new ExprSymbol("car"),
+        new ExprList([
+            new ExprSymbol("cons"),
+            new ExprList([
+                new ExprSymbol("quote"),
+                new ExprSymbol("a"),
+            ]),
+            new ExprList([
+                new ExprSymbol("quote"),
+                new ExprList([
+                    new ExprSymbol("b"),
+                    new ExprSymbol("c"),
+                ]),
+            ]),
+        ]),
+    ]);
+    let expected = new ValueSymbol("a");
+    let actual = reduceFully(load(expr));
+    is(expected, actual, "(car (cons 'a '(b c)))");
+}
+
+{
+    let expr = new ExprList([
+        new ExprSymbol("cdr"),
+        new ExprList([
+            new ExprSymbol("cons"),
+            new ExprList([
+                new ExprSymbol("quote"),
+                new ExprSymbol("a"),
+            ]),
+            new ExprList([
+                new ExprSymbol("quote"),
+                new ExprList([
+                    new ExprSymbol("b"),
+                    new ExprSymbol("c"),
+                ]),
+            ]),
+        ]),
+    ]);
+    let expected = new ValuePair(
+        new ValueSymbol("b"),
+        new ValuePair(
+            new ValueSymbol("c"),
+            new ValueEmptyList(),
+        ),
+    );
+    let actual = reduceFully(load(expr));
+    is(expected, actual, "(cdr (cons 'a '(b c)))");
 }
