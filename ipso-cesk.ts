@@ -87,6 +87,7 @@ export type PKont =
     | KontAtom
     | KontCar
     | KontCdr
+    | KontCond
     | KontCons1
     | KontCons2
     | KontEq1
@@ -108,6 +109,16 @@ export class KontCar {
 
 export class KontCdr {
     constructor(public tail: Kont) {
+    }
+}
+
+export class KontCond {
+    constructor(
+        public consequent: Expr,
+        public env: Env,
+        public operands: Array<[Expr, Expr]>,
+        public tail: Kont,
+    ) {
     }
 }
 
@@ -237,6 +248,30 @@ function handleSymbolOperator(operator: ExprSymbol, operands: Array<Expr>, state
             new KontCdr(state.kont),
         );
     }
+    else if (operator.name === "cond") {
+        assertOperandCount("cond", operands, 1, Infinity);
+        let pairOperands: Array<[Expr, Expr]> = [];
+        for (let operand of operands) {
+            if (!(operand instanceof ExprList)) {
+                throw new Error("Malformed 'cond': operands must be lists");
+            }
+            let es = operand.elements;
+            if (es.length !== 2) {
+                throw new Error("Malformed 'cond': operand lists must be of length 2");
+            }
+            pairOperands.push([es[0], es[1]]);
+        }
+        return new PState(
+            pairOperands[0][0],
+            state.env,
+            new KontCond(
+                pairOperands[0][1],
+                state.env,
+                pairOperands.slice(1),
+                state.kont,
+            ),
+        );
+    }
     else if (operator.name === "cons") {
         assertOperandCount("cons", operands, 2, 2);
         return new PState(
@@ -311,6 +346,28 @@ function reduceRetState(state: RetState): State {
         }
         let retValue = value.cdr;
         return new RetState(new KontRetValue(retValue, kont.tail));
+    }
+    else if (kont instanceof KontCond) {
+        let conditionIsTrue = value instanceof ValueSymbol && value.name === "t";
+        if (conditionIsTrue) {
+            return new PState(kont.consequent, kont.env, kont.tail);
+        }
+        else {
+            let pairOperands = kont.operands;
+            if (pairOperands.length === 0) {
+                throw new Error("Fell off the end of 'cond', not meant to do that");
+            }
+            return new PState(
+                pairOperands[0][0],
+                kont.env,
+                new KontCond(
+                    pairOperands[0][1],
+                    kont.env,
+                    pairOperands.slice(1),
+                    kont.tail,
+                ),
+            );
+        }
     }
     else if (kont instanceof KontCons1) {
         return new PState(kont.operand2, kont.env, new KontCons2(
@@ -703,4 +760,43 @@ function is(expected: Value, actual: Value, message: string): void {
     );
     let actual = reduceFully(load(expr));
     is(expected, actual, "(cdr (cons 'a '(b c)))");
+}
+
+{
+    let expr = new ExprList([
+        new ExprSymbol("cond"),
+        new ExprList([
+            new ExprList([
+                new ExprSymbol("eq"),
+                new ExprList([
+                    new ExprSymbol("quote"),
+                    new ExprSymbol("a"),
+                ]),
+                new ExprList([
+                    new ExprSymbol("quote"),
+                    new ExprSymbol("b"),
+                ]),
+            ]),
+            new ExprList([
+                new ExprSymbol("quote"),
+                new ExprSymbol("first"),
+            ]),
+        ]),
+        new ExprList([
+            new ExprList([
+                new ExprSymbol("atom"),
+                new ExprList([
+                    new ExprSymbol("quote"),
+                    new ExprSymbol("a"),
+                ]),
+            ]),
+            new ExprList([
+                new ExprSymbol("quote"),
+                new ExprSymbol("second"),
+            ]),
+        ]),
+    ]);
+    let expected = new ValueSymbol("second");
+    let actual = reduceFully(load(expr));
+    is(expected, actual, "(cond ((eq 'a 'b) 'first) ((atom 'a) 'second))");
 }
