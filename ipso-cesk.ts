@@ -800,3 +800,75 @@ function is(expected: Value, actual: Value, message: string): void {
     let actual = reduceFully(load(expr));
     is(expected, actual, "(cond ((eq 'a 'b) 'first) ((atom 'a) 'second))");
 }
+
+{
+    let expr = new ExprList([
+        new ExprSymbol("cond"),
+        new ExprList([
+            new ExprList([
+                new ExprSymbol("atom"),
+                new ExprList([
+                    new ExprSymbol("quote"),
+                    new ExprSymbol("a"),
+                ]),
+            ]),
+            new ExprList([
+                new ExprSymbol("quote"),
+                new ExprSymbol("first"),
+            ]),
+        ]),
+        new ExprList([
+            new ExprList([
+                new ExprSymbol("eq"),
+                new ExprList([
+                    new ExprSymbol("quote"),
+                    new ExprSymbol("a"),
+                ]),
+                new ExprList([
+                    new ExprSymbol("quote"),
+                    new ExprSymbol("b"),
+                ]),
+            ]),
+            new ExprList([
+                new ExprSymbol("quote"),
+                new ExprSymbol("second"),
+            ]),
+        ]),
+    ]);
+    let expected = new ValueSymbol("first");
+    let actual = reduceFully(load(expr));
+    is(expected, actual, "(cond ((atom 'a) 'first) ((eq 'a 'b) 'second))");
+}
+
+{
+    let expr = new ExprList([
+        new ExprSymbol("cond"),
+        new ExprList([
+            new ExprList([
+                new ExprSymbol("eq"),
+                new ExprList([
+                    new ExprSymbol("quote"),
+                    new ExprSymbol("a"),
+                ]),
+                new ExprList([
+                    new ExprSymbol("quote"),
+                    new ExprSymbol("b"),
+                ]),
+            ]),
+            new ExprList([
+                new ExprSymbol("quote"),
+                new ExprSymbol("huh"),
+            ]),
+        ]),
+    ]);
+    let expected = new ValueSymbol("exception");
+    let actual = new ValueSymbol("no exception");
+    try {
+        reduceFully(load(expr));
+    }
+    catch {
+        actual = new ValueSymbol("exception");
+    }
+    is(expected, actual, "(cond ((eq 'a 'b) 'huh))");
+}
+
