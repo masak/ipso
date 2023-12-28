@@ -251,7 +251,12 @@ function reduceOne(state: State): State {
     }
 }
 
-function assertOperandCount(name: string, operands: Array<Expr>, min: number, max: number): void {
+function assertOperandCount(
+    name: string,
+    operands: Array<Expr>,
+    min: number,
+    max: number,
+): void {
     if (operands.length < min) {
         throw new Error(operands.length === 0
             ? `'${name}' without operand`
@@ -262,7 +267,11 @@ function assertOperandCount(name: string, operands: Array<Expr>, min: number, ma
     }
 }
 
-function handleSymbolOperator(operator: ExprSymbol, operands: Array<Expr>, state: PState): State {
+function handleSymbolOperator(
+    operator: ExprSymbol,
+    operands: Array<Expr>,
+    state: PState,
+): State {
     if (operator.name === "atom") {
         assertOperandCount("atom", operands, 1, 1);
         return new PState(
@@ -296,7 +305,9 @@ function handleSymbolOperator(operator: ExprSymbol, operands: Array<Expr>, state
             }
             let es = operand.elements;
             if (es.length !== 2) {
-                throw new Error("Malformed 'cond': operand lists must be of length 2");
+                throw new Error(
+                    "Malformed 'cond': operand lists must be of length 2"
+                );
             }
             pairOperands.push([es[0], es[1]]);
         }
@@ -332,11 +343,15 @@ function handleSymbolOperator(operator: ExprSymbol, operands: Array<Expr>, state
         let params = [];
         let paramsOperand = operands[0];
         if (!(paramsOperand instanceof ExprList)) {
-            throw new Error(`Malformed 'lambda': first operand must be parameter list`);
+            throw new Error(
+                `Malformed 'lambda': first operand must be parameter list`
+            );
         }
         for (let paramExpr of paramsOperand.elements) {
             if (!(paramExpr instanceof ExprSymbol)) {
-                throw new Error(`Malformed 'lambda' parameter: must be symbol`);
+                throw new Error(
+                    `Malformed 'lambda' parameter: must be symbol`
+                );
             }
             params.push(paramExpr.name);
         }
@@ -408,7 +423,11 @@ function nextArgOrCall(
         return new PState(fn.body, bodyEnv, tail);
     }
     else {  // at least one more argument to evaluate
-        return new PState(args[i], env, new KontApp2(fn, argValues, args, env, tail));
+        return new PState(
+            args[i],
+            env,
+            new KontApp2(fn, argValues, args, env, tail),
+        );
     }
 }
 
@@ -446,7 +465,8 @@ function reduceRetState(state: RetState): State {
         );
     }
     else if (kont instanceof KontAtom) {
-        let retValue = value instanceof ValueSymbol || value instanceof ValueEmptyList
+        let retValue = value instanceof ValueSymbol ||
+                    value instanceof ValueEmptyList
             ? new ValueSymbol("t")
             : new ValueEmptyList();
         return new RetState(new KontRetValue(retValue, kont.tail));
@@ -466,14 +486,17 @@ function reduceRetState(state: RetState): State {
         return new RetState(new KontRetValue(retValue, kont.tail));
     }
     else if (kont instanceof KontCond) {
-        let conditionIsTrue = value instanceof ValueSymbol && value.name === "t";
+        let conditionIsTrue = value instanceof ValueSymbol &&
+            value.name === "t";
         if (conditionIsTrue) {
             return new PState(kont.consequent, kont.env, kont.tail);
         }
         else {
             let pairOperands = kont.operands;
             if (pairOperands.length === 0) {
-                throw new Error("Fell off the end of 'cond', not meant to do that");
+                throw new Error(
+                    "Fell off the end of 'cond', not meant to do that"
+                );
             }
             return new PState(
                 pairOperands[0][0],
@@ -506,9 +529,10 @@ function reduceRetState(state: RetState): State {
     }
     else if (kont instanceof KontEq2) {
         let arg1 = kont.argument1;
-        let isSameSymbol = value instanceof ValueSymbol && arg1 instanceof ValueSymbol &&
-            value.name === arg1.name;
-        let isSameEmptyList = value instanceof ValueEmptyList && arg1 instanceof ValueEmptyList;
+        let isSameSymbol = value instanceof ValueSymbol &&
+            arg1 instanceof ValueSymbol && value.name === arg1.name;
+        let isSameEmptyList = value instanceof ValueEmptyList &&
+            arg1 instanceof ValueEmptyList;
         let retValue = isSameSymbol || isSameEmptyList
             ? new ValueSymbol("t")
             : new ValueEmptyList();
@@ -537,9 +561,11 @@ function isDeeply(expected: Value, actual: Value): boolean {
         return expected.name === actual.name;
     }
     else if (expected instanceof ValuePair && actual instanceof ValuePair) {
-        return isDeeply(expected.car, actual.car) && isDeeply(expected.cdr, actual.cdr);
+        return isDeeply(expected.car, actual.car) &&
+            isDeeply(expected.cdr, actual.cdr);
     }
-    else if (expected instanceof ValueEmptyList && actual instanceof ValueEmptyList) {
+    else if (expected instanceof ValueEmptyList &&
+        actual instanceof ValueEmptyList) {
         return true;
     }
     else {
