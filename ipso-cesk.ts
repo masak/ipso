@@ -30,6 +30,16 @@ export function envLookup(env: Env, variableName: string): Value {
     throw new Error("Precondition failure: no such variable");
 }
 
+export function tryLookup(env: Env, variableName: string): boolean {
+    while (env instanceof EnvCons) {
+        if (env.variableName === variableName) {
+            return true;
+        }
+        env = env.tail;
+    }
+    return false;
+}
+
 export type Expr =
     | ExprSymbol
     | ExprList;
@@ -272,7 +282,12 @@ function handleSymbolOperator(
     operands: Array<Expr>,
     state: PState,
 ): State {
-    if (operator.name === "atom") {
+    if (tryLookup(state.env, operator.name)) {
+        let fn = envLookup(state.env, operator.name);
+        assertFunctionOfNParams(fn, operands.length);
+        return nextArgOrCall(fn, [], operands, state.env, state.kont);
+    }
+    else if (operator.name === "atom") {
         assertOperandCount("atom", operands, 1, 1);
         return new PState(
             operands[0],
@@ -365,7 +380,7 @@ function handleSymbolOperator(
         return new RetState(new KontRetValue(value, state.kont));
     }
     else {
-        throw new Error(`Unknown operator ${operator.toString()}`);
+        throw new Error(`Unbound variable ${operator.toString()}`);
     }
 }
 
@@ -407,6 +422,20 @@ function reducePState(state: PState): State {
     }
 }
 
+function assertFunctionOfNParams(
+    value: Value,
+    n: number,
+): asserts value is ValueFunction {
+    if (!(value instanceof ValueFunction)) {
+        throw new Error(`Can't apply a ${value.constructor.name}`);
+    }
+    if (value.params.length !== n) {
+        throw new Error(
+            `Function expected ${value.params.length} arguments, called with ${n}`
+        );
+    }
+}
+
 function nextArgOrCall(
     fn: ValueFunction,
     argValues: Array<Value>,
@@ -436,15 +465,7 @@ function reduceRetState(state: RetState): State {
     let value = retKont.value;
     let kont = retKont.tail;
     if (kont instanceof KontApp1) {
-        if (!(value instanceof ValueFunction)) {
-            throw new Error(`Can't apply a ${value.constructor.name}`);
-        }
-        if (value.params.length !== kont.args.length) {
-            throw new Error(
-                `Function expected ${value.params.length} arguments,` +
-                ` called with ${kont.args.length}`
-            );
-        }
+        assertFunctionOfNParams(value, kont.args.length);
         return nextArgOrCall(
             value,
             [],
