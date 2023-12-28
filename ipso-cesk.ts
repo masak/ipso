@@ -55,7 +55,8 @@ export class ExprList {
 export type Value =
     | ValueSymbol
     | ValueEmptyList
-    | ValuePair;
+    | ValuePair
+    | ValueFunction;
 
 export class ValueSymbol {
     constructor(public name: string) {
@@ -81,9 +82,24 @@ export class ValuePair {
     }
 }
 
+export class ValueFunction {
+    constructor(
+        public env: Env,
+        public params: Array<string>,
+        public body: Expr,
+    ) {
+    }
+
+    toString(): string {
+        return `(lambda)`;
+    }
+}
+
 export type Kont = PKont | RetKont;
 
 export type PKont =
+    | KontApp1
+    | KontApp2
     | KontAtom
     | KontCar
     | KontCdr
@@ -96,6 +112,26 @@ export type PKont =
 
 export type RetKont =
     | KontRetValue;
+
+export class KontApp1 {
+    constructor(
+        public args: Array<Expr>,
+        public env: Env,
+        public tail: Kont,
+    ) {
+    }
+}
+
+export class KontApp2 {
+    constructor(
+        public fn: ValueFunction,
+        public argValues: Array<Value>,
+        public args: Array<Expr>,
+        public env: Env,
+        public tail: Kont,
+    ) {
+    }
+}
 
 export class KontAtom {
     constructor(public tail: Kont) {
@@ -169,6 +205,14 @@ export class RetState {
     }
 }
 
+function zip<T, U>(ts: Array<T>, us: Array<U>): Array<[T, U]> {
+    let result: Array<[T, U]> = [];
+    for (let i = 0; i < Math.min(ts.length, us.length); i++) {
+        result.push([ts[i], us[i]]);
+    }
+    return result;
+}
+
 function load(expr: Expr): State {
     return new PState(expr);
 }
@@ -219,12 +263,7 @@ function assertOperandCount(name: string, operands: Array<Expr>, min: number, ma
 }
 
 function handleSymbolOperator(operator: ExprSymbol, operands: Array<Expr>, state: PState): State {
-    if (operator.name === "quote") {
-        assertOperandCount("quote", operands, 1, 1);
-        let value = quoteExpr(operands[0]);
-        return new RetState(new KontRetValue(value, state.kont));
-    }
-    else if (operator.name === "atom") {
+    if (operator.name === "atom") {
         assertOperandCount("atom", operands, 1, 1);
         return new PState(
             operands[0],
@@ -288,6 +327,28 @@ function handleSymbolOperator(operator: ExprSymbol, operands: Array<Expr>, state
             new KontEq1(operands[1], state.env, state.kont),
         );
     }
+    else if (operator.name === "lambda") {
+        assertOperandCount("lambda", operands, 2, 2);
+        let params = [];
+        let paramsOperand = operands[0];
+        if (!(paramsOperand instanceof ExprList)) {
+            throw new Error(`Malformed 'lambda': first operand must be parameter list`);
+        }
+        for (let paramExpr of paramsOperand.elements) {
+            if (!(paramExpr instanceof ExprSymbol)) {
+                throw new Error(`Malformed 'lambda' parameter: must be symbol`);
+            }
+            params.push(paramExpr.name);
+        }
+        let body = operands[1];
+        let value = new ValueFunction(state.env, params, body);
+        return new RetState(new KontRetValue(value, state.kont));
+    }
+    else if (operator.name === "quote") {
+        assertOperandCount("quote", operands, 1, 1);
+        let value = quoteExpr(operands[0]);
+        return new RetState(new KontRetValue(value, state.kont));
+    }
     else {
         throw new Error(`Unknown operator ${operator.toString()}`);
     }
@@ -312,8 +373,16 @@ function reducePState(state: PState): State {
             if (operator instanceof ExprSymbol) {
                 return handleSymbolOperator(operator, operands, state);
             }
-            else {
-                throw new Error("Can't handle non-symbol operator yet");
+            else {  // ExprList
+                return new PState(
+                    operator,
+                    state.env,
+                    new KontApp1(
+                        operands,
+                        state.env,
+                        state.kont,
+                    ),
+                );
             }
         }
     }
@@ -327,7 +396,52 @@ function reduceRetState(state: RetState): State {
     let retKont = state.kont;
     let value = retKont.value;
     let kont = retKont.tail;
-    if (kont instanceof KontAtom) {
+    if (kont instanceof KontApp1) {
+        if (!(value instanceof ValueFunction)) {
+            throw new Error(`Can't apply a ${value.constructor.name}`);
+        }
+        if (value.params.length !== kont.args.length) {
+            throw new Error(
+                `Function expected ${value.params.length} arguments,` +
+                ` called with ${kont.args.length}`
+            );
+        }
+        if (kont.args.length === 0) {
+            let bodyEnv = value.env;
+            return new PState(value.body, bodyEnv, kont.tail);
+        }
+        else {  // at least one argument to evaluate
+            return new PState(kont.args[0], kont.env, new KontApp2(
+                value,
+                [],
+                kont.args,
+                kont.env,
+                kont.tail,
+            ));
+        }
+    }
+    else if (kont instanceof KontApp2) {
+        // sad Schlemiel :(
+        let argValues = [...kont.argValues, value];
+        let i = argValues.length;
+        if (i === kont.args.length) {
+            let bodyEnv = kont.fn.env;
+            for (let [paramName, arg] of zip(kont.fn.params, argValues)) {
+                bodyEnv = extendEnv(bodyEnv, paramName, arg);
+            }
+            return new PState(kont.fn.body, bodyEnv, kont.tail);
+        }
+        else {  // at least one more argument to evaluate
+            return new PState(kont.args[i], kont.env, new KontApp2(
+                kont.fn,
+                argValues,
+                kont.args,
+                kont.env,
+                kont.tail,
+            ));
+        }
+    }
+    else if (kont instanceof KontAtom) {
         let retValue = value instanceof ValueSymbol || value instanceof ValueEmptyList
             ? new ValueSymbol("t")
             : new ValueEmptyList();
@@ -872,3 +986,36 @@ function is(expected: Value, actual: Value, message: string): void {
     is(expected, actual, "(cond ((eq 'a 'b) 'huh))");
 }
 
+{
+    let expr = new ExprList([
+        new ExprList([
+            new ExprSymbol("lambda"),
+            new ExprList([
+                new ExprSymbol("x"),
+            ]),
+            new ExprList([
+                new ExprSymbol("cons"),
+                new ExprSymbol("x"),
+                new ExprList([
+                    new ExprSymbol("quote"),
+                    new ExprList([
+                        new ExprSymbol("b"),
+                    ]),
+                ]),
+            ]),
+        ]),
+        new ExprList([
+            new ExprSymbol("quote"),
+            new ExprSymbol("a"),
+        ]),
+    ]);
+    let expected = new ValuePair(
+        new ValueSymbol("a"),
+        new ValuePair(
+            new ValueSymbol("b"),
+            new ValueEmptyList(),
+        ),
+    );
+    let actual = reduceFully(load(expr));
+    is(expected, actual, "((lambda (x) (cons x '(b))) 'a)");
+}
