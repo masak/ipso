@@ -1093,3 +1093,50 @@ function is(expected: Value, actual: Value, message: string): void {
     let actual = reduceFully(load(expr));
     is(expected, actual, "((lambda (x y) (cons x (cdr y))) 'z '(a b c))");
 }
+
+{
+    let expr = new ExprList([
+        new ExprList([
+            new ExprSymbol("lambda"),
+            new ExprList([
+                new ExprSymbol("f"),
+            ]),
+            new ExprList([
+                new ExprSymbol("f"),
+                new ExprList([
+                    new ExprSymbol("quote"),
+                    new ExprList([
+                        new ExprSymbol("b"),
+                        new ExprSymbol("c"),
+                    ]),
+                ]),
+            ]),
+        ]),
+        new ExprList([
+            new ExprSymbol("lambda"),
+            new ExprList([
+                new ExprSymbol("x"),
+            ]),
+            new ExprList([
+                new ExprSymbol("cons"),
+                new ExprList([
+                    new ExprSymbol("quote"),
+                    new ExprSymbol("a"),
+                ]),
+                new ExprSymbol("x"),
+            ]),
+        ]),
+    ]);
+    let expected = new ValuePair(
+        new ValueSymbol("a"),
+        new ValuePair(
+            new ValueSymbol("b"),
+            new ValuePair(
+                new ValueSymbol("c"),
+                new ValueEmptyList(),
+            ),
+        ),
+    );
+    let actual = reduceFully(load(expr));
+    is(expected, actual, "((lambda (f) (f '(b c))) (lambda (x) (cons 'a x)))");
+}
