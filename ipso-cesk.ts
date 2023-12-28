@@ -392,6 +392,26 @@ function reducePState(state: PState): State {
     }
 }
 
+function nextArgOrCall(
+    fn: ValueFunction,
+    argValues: Array<Value>,
+    args: Array<Expr>,
+    env: Env,
+    tail: Kont,
+): PState {
+    let i = argValues.length;
+    if (i === args.length) {
+        let bodyEnv = fn.env;
+        for (let [paramName, arg] of zip(fn.params, argValues)) {
+            bodyEnv = extendEnv(bodyEnv, paramName, arg);
+        }
+        return new PState(fn.body, bodyEnv, tail);
+    }
+    else {  // at least one more argument to evaluate
+        return new PState(args[i], env, new KontApp2(fn, argValues, args, env, tail));
+    }
+}
+
 function reduceRetState(state: RetState): State {
     let retKont = state.kont;
     let value = retKont.value;
@@ -406,40 +426,24 @@ function reduceRetState(state: RetState): State {
                 ` called with ${kont.args.length}`
             );
         }
-        if (kont.args.length === 0) {
-            let bodyEnv = value.env;
-            return new PState(value.body, bodyEnv, kont.tail);
-        }
-        else {  // at least one argument to evaluate
-            return new PState(kont.args[0], kont.env, new KontApp2(
-                value,
-                [],
-                kont.args,
-                kont.env,
-                kont.tail,
-            ));
-        }
+        return nextArgOrCall(
+            value,
+            [],
+            kont.args,
+            kont.env,
+            kont.tail,
+        );
     }
     else if (kont instanceof KontApp2) {
         // sad Schlemiel :(
         let argValues = [...kont.argValues, value];
-        let i = argValues.length;
-        if (i === kont.args.length) {
-            let bodyEnv = kont.fn.env;
-            for (let [paramName, arg] of zip(kont.fn.params, argValues)) {
-                bodyEnv = extendEnv(bodyEnv, paramName, arg);
-            }
-            return new PState(kont.fn.body, bodyEnv, kont.tail);
-        }
-        else {  // at least one more argument to evaluate
-            return new PState(kont.args[i], kont.env, new KontApp2(
-                kont.fn,
-                argValues,
-                kont.args,
-                kont.env,
-                kont.tail,
-            ));
-        }
+        return nextArgOrCall(
+            kont.fn,
+            argValues,
+            kont.args,
+            kont.env,
+            kont.tail,
+        );
     }
     else if (kont instanceof KontAtom) {
         let retValue = value instanceof ValueSymbol || value instanceof ValueEmptyList
