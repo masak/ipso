@@ -370,17 +370,7 @@ export const standardEnv = (() => {
     env = extendEnv(
         env,
         "cadr",
-        new ValueFunction(
-            env,
-            ["x"],
-            new ExprList([
-                new ExprSymbol("car"),
-                new ExprList([
-                    new ExprSymbol("cdr"),
-                    new ExprSymbol("x"),
-                ]),
-            ]),
-        ),
+        new ValueFunction(env, ["x"], parseToExpr("(car (cdr x))")),
     );
     return env;
 })();
