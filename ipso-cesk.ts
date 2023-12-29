@@ -362,16 +362,28 @@ const standardEnvBindings: Array<[string, Value]> = [
     ["quote", FORM_QUOTE],
 ];
 
+function addBuiltin(env: Env, name: string, params: string, body: string): Env {
+    let paramsExpr = parseToExpr(params);
+    if (!(paramsExpr instanceof ExprList)) {
+        throw new Error("Precondition failed: param list must be a list");
+    }
+    let paramsArray = paramsExpr.elements.map((elem) => {
+        if (!(elem instanceof ExprSymbol)) {
+            throw new Error("Precondition failed: parameter must be symbol");
+        }
+        return elem.name;
+    });
+    let bodyExpr = parseToExpr(body);
+    let fnValue = new ValueFunction(env, paramsArray, bodyExpr);
+    return extendEnv(env, name, fnValue);
+}
+
 export const standardEnv = (() => {
     let env = standardEnvBindings.reduce(
         (env, [name, value]) => extendEnv(env, name, value),
         emptyEnv,
     );
-    env = extendEnv(
-        env,
-        "cadr",
-        new ValueFunction(env, ["x"], parseToExpr("(car (cdr x))")),
-    );
+    env = addBuiltin(env, "cadr", "(x)", "(car (cdr x))");
     return env;
 })();
 
