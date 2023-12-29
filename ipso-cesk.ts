@@ -1,17 +1,22 @@
 export type Value =
-    | ValueSymbol
+    | ValueBuiltinFunction
     | ValueEmptyList
     | ValueFunction
     | ValuePair
-    | ValuePrimitive
+    | ValueSpecialForm
+    | ValueSymbol
     | ValueUnthinkable;
 
-export class ValueSymbol {
-    constructor(public name: string) {
+export class ValueBuiltinFunction {
+    constructor(
+        public name: string,
+        public paramCount: number,
+        public body: (args: Array<Value>) => Value,
+    ) {
     }
 
     toString(): string {
-        return this.name;
+        return `<builtin ${name}>`;
     }
 }
 
@@ -43,12 +48,21 @@ export class ValuePair {
     }
 }
 
-export class ValuePrimitive {
+export class ValueSpecialForm {
     constructor(public name: string) {
     }
 
     toString(): string {
-        return `<primitive ${this.name}>`;
+        return `<form ${this.name}>`;
+    }
+}
+
+export class ValueSymbol {
+    constructor(public name: string) {
+    }
+
+    toString(): string {
+        return this.name;
     }
 }
 
@@ -58,15 +72,56 @@ export class ValueUnthinkable {
     }
 }
 
-export const PRIM_ATOM = new ValuePrimitive("atom");
-export const PRIM_CAR = new ValuePrimitive("car");
-export const PRIM_CDR = new ValuePrimitive("cdr");
-export const PRIM_COND = new ValuePrimitive("cond");
-export const PRIM_CONS = new ValuePrimitive("cons");
-export const PRIM_EQ = new ValuePrimitive("eq");
-export const PRIM_LABEL = new ValuePrimitive("label");
-export const PRIM_LAMBDA = new ValuePrimitive("lambda");
-export const PRIM_QUOTE = new ValuePrimitive("quote");
+export const BIF_ATOM = new ValueBuiltinFunction(
+    "atom",
+    1,
+    ([value]) =>
+        value instanceof ValueSymbol || value instanceof ValueEmptyList
+            ? new ValueSymbol("t")
+            : new ValueEmptyList(),
+);
+export const BIF_CAR = new ValueBuiltinFunction(
+    "car",
+    1,
+    ([value]) => {
+        if (!(value instanceof ValuePair)) {
+            throw new Error("Can't 'car' on a non-pair");
+        }
+        return value.car;
+    },
+);
+export const BIF_CDR = new ValueBuiltinFunction(
+    "cdr",
+    1,
+    ([value]) => {
+        if (!(value instanceof ValuePair)) {
+            throw new Error("Can't 'cdr' on a non-pair");
+        }
+        return value.cdr;
+    },
+);
+export const FORM_COND = new ValueSpecialForm("cond");
+export const BIF_CONS = new ValueBuiltinFunction(
+    "cons",
+    2,
+    ([car, cdr]) => new ValuePair(car, cdr),
+);
+export const BIF_EQ = new ValueBuiltinFunction(
+    "eq",
+    2,
+    ([x, y]) => {
+        let isSameSymbol = x instanceof ValueSymbol &&
+            y instanceof ValueSymbol && x.name === y.name;
+        let isSameEmptyList = x instanceof ValueEmptyList &&
+            y instanceof ValueEmptyList;
+        return isSameSymbol || isSameEmptyList
+            ? new ValueSymbol("t")
+            : new ValueEmptyList();
+    },
+);
+export const FORM_LABEL = new ValueSpecialForm("label");
+export const FORM_LAMBDA = new ValueSpecialForm("lambda");
+export const FORM_QUOTE = new ValueSpecialForm("quote");
 
 function parseToValue(input: string): Value {
     let worklist: Array<Array<Value>> = [[]];
@@ -199,15 +254,15 @@ export function recklesslyClobberBinding(
 }
 
 const standardEnvBindings: Array<[string, Value]> = [
-    ["atom", PRIM_ATOM],
-    ["car", PRIM_CAR],
-    ["cdr", PRIM_CDR],
-    ["cond", PRIM_COND],
-    ["cons", PRIM_CONS],
-    ["eq", PRIM_EQ],
-    ["label", PRIM_LABEL],
-    ["lambda", PRIM_LAMBDA],
-    ["quote", PRIM_QUOTE],
+    ["atom", BIF_ATOM],
+    ["car", BIF_CAR],
+    ["cdr", BIF_CDR],
+    ["cond", FORM_COND],
+    ["cons", BIF_CONS],
+    ["eq", BIF_EQ],
+    ["label", FORM_LABEL],
+    ["lambda", FORM_LAMBDA],
+    ["quote", FORM_QUOTE],
 ];
 
 export const standardEnv = standardEnvBindings.reduce(
@@ -317,14 +372,7 @@ export type Kont = PKont | RetKont;
 export type PKont =
     | KontApp1
     | KontApp2
-    | KontAtom
-    | KontCar
-    | KontCdr
     | KontCond
-    | KontCons1
-    | KontCons2
-    | KontEq1
-    | KontEq2
     | KontLabel
     | KontSucceed;
 
@@ -342,27 +390,12 @@ export class KontApp1 {
 
 export class KontApp2 {
     constructor(
-        public fn: ValueFunction,
+        public fn: ValueFunction | ValueBuiltinFunction,
         public argValues: Array<Value>,
         public args: Array<Expr>,
         public env: Env,
         public tail: Kont,
     ) {
-    }
-}
-
-export class KontAtom {
-    constructor(public tail: Kont) {
-    }
-}
-
-export class KontCar {
-    constructor(public tail: Kont) {
-    }
-}
-
-export class KontCdr {
-    constructor(public tail: Kont) {
     }
 }
 
@@ -373,26 +406,6 @@ export class KontCond {
         public operands: Array<[Expr, Expr]>,
         public tail: Kont,
     ) {
-    }
-}
-
-export class KontCons1 {
-    constructor(public operand2: Expr, public env: Env, public tail: Kont) {
-    }
-}
-
-export class KontCons2 {
-    constructor(public argument1: Value, public tail: Kont) {
-    }
-}
-
-export class KontEq1 {
-    constructor(public operand2: Expr, public env: Env, public tail: Kont) {
-    }
-}
-
-export class KontEq2 {
-    constructor(public argument1: Value, public tail: Kont) {
     }
 }
 
@@ -526,32 +539,49 @@ function reducePState(state: PState): State {
 function assertFunctionOfNParams(
     value: Value,
     n: number,
-): asserts value is ValueFunction {
-    if (!(value instanceof ValueFunction)) {
-        throw new Error(`Can't apply a ${value.constructor.name}`);
+): asserts value is ValueFunction | ValueBuiltinFunction {
+    if (value instanceof ValueFunction) {
+        if (value.params.length !== n) {
+            throw new Error(
+                `Function expected ${value.params.length} arguments,` +
+                ` called with ${n}`
+            );
+        }
     }
-    if (value.params.length !== n) {
-        throw new Error(
-            `Function expected ${value.params.length} arguments,` +
-            ` called with ${n}`
-        );
+    else if (value instanceof ValueBuiltinFunction) {
+        if (value.paramCount !== n) {
+            throw new Error(
+                `Built-in function '${value.name}' expected ` +
+                `${value.paramCount} arguments,` +
+                ` called with ${n}`
+            );
+        }
+    }
+    else {
+        throw new Error(`Can't apply a ${value.constructor.name}`);
     }
 }
 
 function nextArgOrCall(
-    fn: ValueFunction,
+    fn: ValueFunction | ValueBuiltinFunction,
     argValues: Array<Value>,
     args: Array<Expr>,
     env: Env,
     tail: Kont,
-): PState {
+): State {
     let i = argValues.length;
     if (i === args.length) {
-        let bodyEnv = fn.env;
-        for (let [paramName, arg] of zip(fn.params, argValues)) {
-            bodyEnv = extendEnv(bodyEnv, paramName, arg);
+        if (fn instanceof ValueFunction) {
+            let bodyEnv = fn.env;
+            for (let [paramName, arg] of zip(fn.params, argValues)) {
+                bodyEnv = extendEnv(bodyEnv, paramName, arg);
+            }
+            return new PState(fn.body, bodyEnv, tail);
         }
-        return new PState(fn.body, bodyEnv, tail);
+        else {  // ValueBuiltinFunction
+            let result = fn.body(argValues);
+            return new RetState(new KontRetValue(result, tail));
+        }
     }
     else {  // at least one more argument to evaluate
         return new PState(
@@ -567,31 +597,7 @@ function reduceRetState(state: RetState): State {
     let value = retKont.value;
     let kont = retKont.tail;
     if (kont instanceof KontApp1) {
-        if (value === PRIM_ATOM) {
-            assertOperandCount("atom", kont.args, 1, 1);
-            return new PState(
-                kont.args[0],
-                kont.env,
-                new KontAtom(kont.tail),
-            );
-        }
-        else if (value === PRIM_CAR) {
-            assertOperandCount("car", kont.args, 1, 1);
-            return new PState(
-                kont.args[0],
-                kont.env,
-                new KontCar(kont.tail),
-            );
-        }
-        else if (value === PRIM_CDR) {
-            assertOperandCount("cdr", kont.args, 1, 1);
-            return new PState(
-                kont.args[0],
-                kont.env,
-                new KontCdr(kont.tail),
-            );
-        }
-        else if (value === PRIM_COND) {
+        if (value === FORM_COND) {
             assertOperandCount("cond", kont.args, 1, Infinity);
             let pairOperands: Array<[Expr, Expr]> = [];
             for (let operand of kont.args) {
@@ -619,23 +625,7 @@ function reduceRetState(state: RetState): State {
                 ),
             );
         }
-        else if (value === PRIM_CONS) {
-            assertOperandCount("cons", kont.args, 2, 2);
-            return new PState(
-                kont.args[0],
-                kont.env,
-                new KontCons1(kont.args[1], kont.env, kont.tail),
-            )
-        }
-        else if (value === PRIM_EQ) {
-            assertOperandCount("eq", kont.args, 2, 2);
-            return new PState(
-                kont.args[0],
-                kont.env,
-                new KontEq1(kont.args[1], kont.env, kont.tail),
-            );
-        }
-        else if (value === PRIM_LABEL) {
+        else if (value === FORM_LABEL) {
             assertOperandCount("label", kont.args, 2, 2);
             let labelSymbol = kont.args[0];
             if (!(labelSymbol instanceof ExprSymbol)) {
@@ -653,7 +643,7 @@ function reduceRetState(state: RetState): State {
                 new KontLabel(labelName, extendedEnv, kont.tail),
             );
         }
-        else if (value === PRIM_LAMBDA) {
+        else if (value === FORM_LAMBDA) {
             assertOperandCount("lambda", kont.args, 2, 2);
             let params = [];
             let paramsOperand = kont.args[0];
@@ -674,7 +664,7 @@ function reduceRetState(state: RetState): State {
             let value = new ValueFunction(kont.env, params, body);
             return new RetState(new KontRetValue(value, kont.tail));
         }
-        else if (value === PRIM_QUOTE) {
+        else if (value === FORM_QUOTE) {
             assertOperandCount("quote", kont.args, 1, 1);
             let value = quoteExpr(kont.args[0]);
             return new RetState(new KontRetValue(value, kont.tail));
@@ -701,27 +691,6 @@ function reduceRetState(state: RetState): State {
             kont.tail,
         );
     }
-    else if (kont instanceof KontAtom) {
-        let retValue = value instanceof ValueSymbol ||
-                    value instanceof ValueEmptyList
-            ? new ValueSymbol("t")
-            : new ValueEmptyList();
-        return new RetState(new KontRetValue(retValue, kont.tail));
-    }
-    else if (kont instanceof KontCar) {
-        if (!(value instanceof ValuePair)) {
-            throw new Error("Can't 'car' on a non-pair");
-        }
-        let retValue = value.car;
-        return new RetState(new KontRetValue(retValue, kont.tail));
-    }
-    else if (kont instanceof KontCdr) {
-        if (!(value instanceof ValuePair)) {
-            throw new Error("Can't 'cdr' on a non-pair");
-        }
-        let retValue = value.cdr;
-        return new RetState(new KontRetValue(retValue, kont.tail));
-    }
     else if (kont instanceof KontCond) {
         let conditionIsTrue = value instanceof ValueSymbol &&
             value.name === "t";
@@ -746,34 +715,6 @@ function reduceRetState(state: RetState): State {
                 ),
             );
         }
-    }
-    else if (kont instanceof KontCons1) {
-        return new PState(kont.operand2, kont.env, new KontCons2(
-            value,
-            kont.tail,
-        ));
-    }
-    else if (kont instanceof KontCons2) {
-        let arg1 = kont.argument1;
-        let retValue = new ValuePair(arg1, value);
-        return new RetState(new KontRetValue(retValue, kont.tail));
-    }
-    else if (kont instanceof KontEq1) {
-        return new PState(kont.operand2, kont.env, new KontEq2(
-            value,
-            kont.tail,
-        ));
-    }
-    else if (kont instanceof KontEq2) {
-        let arg1 = kont.argument1;
-        let isSameSymbol = value instanceof ValueSymbol &&
-            arg1 instanceof ValueSymbol && value.name === arg1.name;
-        let isSameEmptyList = value instanceof ValueEmptyList &&
-            arg1 instanceof ValueEmptyList;
-        let retValue = isSameSymbol || isSameEmptyList
-            ? new ValueSymbol("t")
-            : new ValueEmptyList();
-        return new RetState(new KontRetValue(retValue, kont.tail));
     }
     else if (kont instanceof KontLabel) {
         // What morally justifies being reckless here is that we know
