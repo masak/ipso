@@ -23,11 +23,17 @@ export function extendEnv(env: Env, variableName: string, value: Value): Env {
 export function envLookup(env: Env, variableName: string): Value {
     while (env instanceof EnvCons) {
         if (env.variableName === variableName) {
-            return env.value;
+            let value = env.value;
+            if (value instanceof ValueUnthinkable) {
+                throw new Error(
+                    "Precondition failed: unthinkable value looked up"
+                );
+            }
+            return value;
         }
         env = env.tail;
     }
-    throw new Error("Precondition failure: no such variable");
+    throw new Error("Precondition failed: no such variable");
 }
 
 export function tryLookup(env: Env, variableName: string): boolean {
@@ -38,6 +44,29 @@ export function tryLookup(env: Env, variableName: string): boolean {
         env = env.tail;
     }
     return false;
+}
+
+// A combination of envLookup and extendEnv, in that it finds an existing
+// binding, and overwrites its value. This is not a good thing to do in
+// general, but we only use it once, to "tie the knot" in a `label`
+// construct. We don't need to go all CESK just to do that; instead we
+// surgically replace that one binding after evaluating the value (using
+// an environment which already had the binding, but set to an unthinkable
+// value).
+export function recklesslyClobberBinding(env: Env, variableName: string, value: Value): void {
+    while (env instanceof EnvCons) {
+        if (env.variableName === variableName) {
+            if (!(env.value instanceof ValueUnthinkable)) {
+                throw new Error(
+                    "Precondition failed: clobbered value is thinkable"
+                );
+            }
+            env.value = value;
+            return;
+        }
+        env = env.tail;
+    }
+    throw new Error("Precondition failed: no such variable");
 }
 
 export type Expr =
@@ -140,8 +169,9 @@ function parseToExpr(input: string): Expr {
 export type Value =
     | ValueSymbol
     | ValueEmptyList
+    | ValueFunction
     | ValuePair
-    | ValueFunction;
+    | ValueUnthinkable;
 
 export class ValueSymbol {
     constructor(public name: string) {
@@ -158,15 +188,6 @@ export class ValueEmptyList {
     }
 }
 
-export class ValuePair {
-    constructor(public car: Value, public cdr: Value) {
-    }
-
-    toString(): string {
-        return `(${this.car.toString()} . ${this.cdr.toString()})`;
-    }
-}
-
 export class ValueFunction {
     constructor(
         public env: Env,
@@ -176,7 +197,22 @@ export class ValueFunction {
     }
 
     toString(): string {
-        return `(lambda)`;
+        return `<lambda>`;
+    }
+}
+
+export class ValuePair {
+    constructor(public car: Value, public cdr: Value) {
+    }
+
+    toString(): string {
+        return `(${this.car.toString()} . ${this.cdr.toString()})`;
+    }
+}
+
+export class ValueUnthinkable {
+    toString(): string {
+        return `<unthinkable>`;
     }
 }
 
@@ -250,6 +286,7 @@ export type PKont =
     | KontCons2
     | KontEq1
     | KontEq2
+    | KontLabel
     | KontSucceed;
 
 export type RetKont =
@@ -317,6 +354,11 @@ export class KontEq1 {
 
 export class KontEq2 {
     constructor(public argument1: Value, public tail: Kont) {
+    }
+}
+
+export class KontLabel {
+    constructor(public name: string, public env: Env, public tail: Kont) {
     }
 }
 
@@ -485,6 +527,24 @@ function handleSymbolOperator(
             new KontEq1(operands[1], state.env, state.kont),
         );
     }
+    else if (operator.name === "label") {
+        assertOperandCount("label", operands, 2, 2);
+        let labelSymbol = operands[0];
+        if (!(labelSymbol instanceof ExprSymbol)) {
+            throw new Error(`First operand to 'label' must be a symbol`);
+        }
+        let labelName = labelSymbol.name;
+        let extendedEnv = extendEnv(
+            state.env,
+            labelName,
+            new ValueUnthinkable(),
+        );
+        return new PState(
+            operands[1],
+            extendedEnv,
+            new KontLabel(labelName, extendedEnv, state.kont),
+        );
+    }
     else if (operator.name === "lambda") {
         assertOperandCount("lambda", operands, 2, 2);
         let params = [];
@@ -563,7 +623,8 @@ function assertFunctionOfNParams(
     }
     if (value.params.length !== n) {
         throw new Error(
-            `Function expected ${value.params.length} arguments, called with ${n}`
+            `Function expected ${value.params.length} arguments,` +
+            ` called with ${n}`
         );
     }
 }
@@ -690,6 +751,16 @@ function reduceRetState(state: RetState): State {
             ? new ValueSymbol("t")
             : new ValueEmptyList();
         return new RetState(new KontRetValue(retValue, kont.tail));
+    }
+    else if (kont instanceof KontLabel) {
+        // What morally justifies being reckless here is that we know
+        // we arrived at `value` without ever looking at the binding
+        // in the extended environment. (If we did, we would have gotten
+        // an error from envLookup.) We clobber the binding to have
+        // the intended binding; it's as if it always had that binding
+        // (in an impossible, time-travel kind of way). 
+        recklesslyClobberBinding(kont.env, kont.name, value);
+        return new RetState(new KontRetValue(value, kont.tail));
     }
     else if (kont instanceof KontSucceed) {
         throw new Error("Precondition broken: succeed within ret");
@@ -893,8 +964,25 @@ function is(expected: Value, actual: Value, message: string): void {
 }
 
 {
-    let expr = parseToExpr("((lambda (f) (f '(b c))) (lambda (x) (cons 'a x)))");
+    let expr = parseToExpr(
+        "((lambda (f) (f '(b c))) (lambda (x) (cons 'a x)))"
+    );
     let expected = parseToValue("(a b c)");
     let actual = reduceFully(load(expr));
     is(expected, actual, "((lambda (f) (f '(b c))) (lambda (x) (cons 'a x)))");
+}
+
+{
+    let expr = parseToExpr(`
+        ((label subst (lambda (x y z)
+           (cond ((atom z)
+                  (cond ((eq z y) x)
+                         ('t z)))
+                 ('t (cons (subst x y (car z))
+                           (subst x y (cdr z)))))))
+         'm 'b '(a b (a b c) d))
+    `);
+    let expected = parseToValue("(a m (a m c) d)");
+    let actual = reduceFully(load(expr));
+    is(expected, actual, "((label subst ...) 'm 'b ...)");
 }
