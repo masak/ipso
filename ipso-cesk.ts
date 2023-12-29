@@ -62,6 +62,81 @@ export class ExprList {
     }
 }
 
+function maybeWrapInQuote(expr: Expr, shouldWrap: boolean): Expr {
+    return shouldWrap
+        ? new ExprList([new ExprSymbol("quote"), expr])
+        : expr;
+}
+
+const TOKENIZER = /^(?:\s+|\(|\)|'|[\p{Letter}\p{Number}+\-*\/]+)/u;
+const ALL_WHITESPACE = /^\s+$/;
+
+function parseToExpr(input: string): Expr {
+    let worklist: Array<Array<Expr>> = [[]];
+    // invariant: worklist.length === shouldQuoteStack.length
+    let shouldQuoteStack: Array<boolean> = [false];
+    let pos = 0;
+    let previousWasQuote = false;
+    while (pos < input.length) {
+        let suffix = input.substring(pos);
+        let m = suffix.match(TOKENIZER);
+        if (m === null) {
+            let frag = suffix.substring(0, 5);
+            throw new Error(`Failed to match at position ${pos}: '${frag}'`);
+        }
+        let token = m[0];
+        let posAfter = pos + token.length;
+        let wsMatch = token.match(ALL_WHITESPACE);
+        let lastIndex = worklist.length - 1;
+        let currentIsQuote = false;
+        if (wsMatch !== null) {
+            // skip silently
+        }
+        else if (token === "(") {
+            worklist.push([]);
+            shouldQuoteStack.push(previousWasQuote);
+        }
+        else if (token === ")") {
+            if (previousWasQuote) {
+                throw new Error(`Quote followed by ')' at ${pos}`);
+            }
+            if (worklist.length <= 1) { // off-by-one: index 0 is top level
+                throw new Error(`Found ')' without '(' at pos ${pos}`);
+            }
+            let elements = worklist.pop()!; // we checked that it exists
+            let wrap = shouldQuoteStack.pop()!;  // ditto, via invariant
+            let exprList = new ExprList(elements);
+            lastIndex = worklist.length - 1;
+            let newElement = maybeWrapInQuote(exprList, wrap);
+            worklist[lastIndex].push(newElement);
+        }
+        else if (token === "'") {
+            currentIsQuote = true;
+        }
+        else {  // it's a symbol; catch-all case
+            let exprSymbol = new ExprSymbol(token);
+            let newElement = maybeWrapInQuote(exprSymbol, previousWasQuote);
+            worklist[lastIndex].push(newElement);
+        }
+        pos = posAfter;
+        previousWasQuote = currentIsQuote;
+        // Rough reasoning that this loop terminates: each matched token has
+        // a positive length. Unless we thrown an error, we always add that
+        // length to `pos`. We're upper-bounded on the input length.
+    }
+    if (worklist.length > 1) {
+        throw new Error(`Missing ')' at end of input`);
+    }
+    let loneExpr = worklist[0];
+    if (loneExpr.length === 0) {
+        throw new Error("Empty input");
+    }
+    else if (loneExpr.length > 1) {
+        throw new Error("Two terms in a row at top level");
+    }
+    return loneExpr[0];
+}
+
 export type Value =
     | ValueSymbol
     | ValueEmptyList
@@ -608,21 +683,14 @@ function is(expected: Value, actual: Value, message: string): void {
 }
 
 {
-    let expr = new ExprList([new ExprSymbol("quote"), new ExprSymbol("a")]);
+    let expr = parseToExpr("(quote a)");
     let expected = new ValueSymbol("a");
     let actual = reduceFully(load(expr));
-    is(expected, actual, "(quoate a)");
+    is(expected, actual, "(quote a)");
 }
 
 {
-    let expr = new ExprList([
-        new ExprSymbol("quote"),
-        new ExprList([
-            new ExprSymbol("a"),
-            new ExprSymbol("b"),
-            new ExprSymbol("c"),
-        ]),
-    ]);
+    let expr = parseToExpr("(quote (a b c))");
     let expected = new ValuePair(
         new ValueSymbol("a"),
         new ValuePair(
@@ -634,167 +702,74 @@ function is(expected: Value, actual: Value, message: string): void {
         ),
     );
     let actual = reduceFully(load(expr));
-    is(expected, actual, "(quoate (a b c))");
+    is(expected, actual, "(quote (a b c))");
 }
 
 {
-    let expr = new ExprList([
-        new ExprSymbol("atom"),
-        new ExprList([
-            new ExprSymbol("quote"),
-            new ExprSymbol("a"),
-        ]),
-    ]);
+    let expr = parseToExpr("(atom 'a)");
     let expected = new ValueSymbol("t");
     let actual = reduceFully(load(expr));
     is(expected, actual, "(atom 'a)");
 }
 
 {
-    let expr = new ExprList([
-        new ExprSymbol("atom"),
-        new ExprList([
-            new ExprSymbol("quote"),
-            new ExprList([
-                new ExprSymbol("a"),
-                new ExprSymbol("b"),
-                new ExprSymbol("c"),
-            ]),
-        ]),
-    ]);
+    let expr = parseToExpr("(atom '(a b c))");
     let expected = new ValueEmptyList();
     let actual = reduceFully(load(expr));
     is(expected, actual, "(atom '(a b c))");
 }
 
 {
-    let expr = new ExprList([
-        new ExprSymbol("atom"),
-        new ExprList([
-            new ExprSymbol("quote"),
-            new ExprList([]),
-        ]),
-    ]);
+    let expr = parseToExpr("(atom '())");
     let expected = new ValueSymbol("t");
     let actual = reduceFully(load(expr));
     is(expected, actual, "(atom '())");
 }
 
 {
-    let expr = new ExprList([
-        new ExprSymbol("atom"),
-        new ExprList([
-            new ExprSymbol("atom"),
-            new ExprList([
-                new ExprSymbol("quote"),
-                new ExprSymbol("a"),
-            ]),
-        ]),
-    ]);
+    let expr = parseToExpr("(atom (atom 'a))");
     let expected = new ValueSymbol("t");
     let actual = reduceFully(load(expr));
     is(expected, actual, "(atom (atom 'a))");
 }
 
 {
-    let expr = new ExprList([
-        new ExprSymbol("atom"),
-        new ExprList([
-            new ExprSymbol("quote"),
-            new ExprList([
-                new ExprSymbol("atom"),
-                new ExprList([
-                    new ExprSymbol("quote"),
-                    new ExprSymbol("a"),
-                ]),
-            ]),
-        ]),
-    ]);
+    let expr = parseToExpr("(atom '(atom 'a))");
     let expected = new ValueEmptyList();
     let actual = reduceFully(load(expr));
     is(expected, actual, "(atom '(atom 'a))");
 }
 
 {
-    let expr = new ExprList([
-        new ExprSymbol("eq"),
-        new ExprList([
-            new ExprSymbol("quote"),
-            new ExprSymbol("a"),
-        ]),
-        new ExprList([
-            new ExprSymbol("quote"),
-            new ExprSymbol("a"),
-        ]),
-    ]);
+    let expr = parseToExpr("(eq 'a 'a)");
     let expected = new ValueSymbol("t");
     let actual = reduceFully(load(expr));
     is(expected, actual, "(eq 'a 'a)");
 }
 
 {
-    let expr = new ExprList([
-        new ExprSymbol("eq"),
-        new ExprList([
-            new ExprSymbol("quote"),
-            new ExprSymbol("a"),
-        ]),
-        new ExprList([
-            new ExprSymbol("quote"),
-            new ExprSymbol("b"),
-        ]),
-    ]);
+    let expr = parseToExpr("(eq 'a 'b)");
     let expected = new ValueEmptyList();
     let actual = reduceFully(load(expr));
     is(expected, actual, "(eq 'a 'b)");
 }
 
 {
-    let expr = new ExprList([
-        new ExprSymbol("eq"),
-        new ExprList([
-            new ExprSymbol("quote"),
-            new ExprList([]),
-        ]),
-        new ExprList([
-            new ExprSymbol("quote"),
-            new ExprList([]),
-        ]),
-    ]);
+    let expr = parseToExpr("(eq '() '())");
     let expected = new ValueSymbol("t");
     let actual = reduceFully(load(expr));
     is(expected, actual, "(eq '() '())");
 }
 
 {
-    let expr = new ExprList([
-        new ExprSymbol("car"),
-        new ExprList([
-            new ExprSymbol("quote"),
-            new ExprList([
-                new ExprSymbol("a"),
-                new ExprSymbol("b"),
-                new ExprSymbol("c"),
-            ]),
-        ]),
-    ]);
+    let expr = parseToExpr("(car '(a b c))");
     let expected = new ValueSymbol("a");
     let actual = reduceFully(load(expr));
     is(expected, actual, "(car '(a b c))");
 }
 
 {
-    let expr = new ExprList([
-        new ExprSymbol("cdr"),
-        new ExprList([
-            new ExprSymbol("quote"),
-            new ExprList([
-                new ExprSymbol("a"),
-                new ExprSymbol("b"),
-                new ExprSymbol("c"),
-            ]),
-        ]),
-    ]);
+    let expr = parseToExpr("(cdr '(a b c))");
     let expected = new ValuePair(
         new ValueSymbol("b"),
         new ValuePair(
@@ -807,20 +782,7 @@ function is(expected: Value, actual: Value, message: string): void {
 }
 
 {
-    let expr = new ExprList([
-        new ExprSymbol("cons"),
-        new ExprList([
-            new ExprSymbol("quote"),
-            new ExprSymbol("a"),
-        ]),
-        new ExprList([
-            new ExprSymbol("quote"),
-            new ExprList([
-                new ExprSymbol("b"),
-                new ExprSymbol("c"),
-            ]),
-        ]),
-    ]);
+    let expr = parseToExpr("(cons 'a '(b c))");
     let expected = new ValuePair(
         new ValueSymbol("a"),
         new ValuePair(
@@ -836,31 +798,7 @@ function is(expected: Value, actual: Value, message: string): void {
 }
 
 {
-    let expr = new ExprList([
-        new ExprSymbol("cons"),
-        new ExprList([
-            new ExprSymbol("quote"),
-            new ExprSymbol("a"),
-        ]),
-        new ExprList([
-            new ExprSymbol("cons"),
-            new ExprList([
-                new ExprSymbol("quote"),
-                new ExprSymbol("b"),
-            ]),
-            new ExprList([
-                new ExprSymbol("cons"),
-                new ExprList([
-                    new ExprSymbol("quote"),
-                    new ExprSymbol("c"),
-                ]),
-                new ExprList([
-                    new ExprSymbol("quote"),
-                    new ExprList([]),
-                ]),
-            ]),
-        ]),
-    ]);
+    let expr = parseToExpr("(cons 'a (cons 'b (cons 'c '())))");
     let expected = new ValuePair(
         new ValueSymbol("a"),
         new ValuePair(
@@ -876,46 +814,14 @@ function is(expected: Value, actual: Value, message: string): void {
 }
 
 {
-    let expr = new ExprList([
-        new ExprSymbol("car"),
-        new ExprList([
-            new ExprSymbol("cons"),
-            new ExprList([
-                new ExprSymbol("quote"),
-                new ExprSymbol("a"),
-            ]),
-            new ExprList([
-                new ExprSymbol("quote"),
-                new ExprList([
-                    new ExprSymbol("b"),
-                    new ExprSymbol("c"),
-                ]),
-            ]),
-        ]),
-    ]);
+    let expr = parseToExpr("(car (cons 'a '(b c)))");
     let expected = new ValueSymbol("a");
     let actual = reduceFully(load(expr));
     is(expected, actual, "(car (cons 'a '(b c)))");
 }
 
 {
-    let expr = new ExprList([
-        new ExprSymbol("cdr"),
-        new ExprList([
-            new ExprSymbol("cons"),
-            new ExprList([
-                new ExprSymbol("quote"),
-                new ExprSymbol("a"),
-            ]),
-            new ExprList([
-                new ExprSymbol("quote"),
-                new ExprList([
-                    new ExprSymbol("b"),
-                    new ExprSymbol("c"),
-                ]),
-            ]),
-        ]),
-    ]);
+    let expr = parseToExpr("(cdr (cons 'a '(b c)))");
     let expected = new ValuePair(
         new ValueSymbol("b"),
         new ValuePair(
@@ -928,104 +834,21 @@ function is(expected: Value, actual: Value, message: string): void {
 }
 
 {
-    let expr = new ExprList([
-        new ExprSymbol("cond"),
-        new ExprList([
-            new ExprList([
-                new ExprSymbol("eq"),
-                new ExprList([
-                    new ExprSymbol("quote"),
-                    new ExprSymbol("a"),
-                ]),
-                new ExprList([
-                    new ExprSymbol("quote"),
-                    new ExprSymbol("b"),
-                ]),
-            ]),
-            new ExprList([
-                new ExprSymbol("quote"),
-                new ExprSymbol("first"),
-            ]),
-        ]),
-        new ExprList([
-            new ExprList([
-                new ExprSymbol("atom"),
-                new ExprList([
-                    new ExprSymbol("quote"),
-                    new ExprSymbol("a"),
-                ]),
-            ]),
-            new ExprList([
-                new ExprSymbol("quote"),
-                new ExprSymbol("second"),
-            ]),
-        ]),
-    ]);
+    let expr = parseToExpr("(cond ((eq 'a 'b) 'first) ((atom 'a) 'second))");
     let expected = new ValueSymbol("second");
     let actual = reduceFully(load(expr));
     is(expected, actual, "(cond ((eq 'a 'b) 'first) ((atom 'a) 'second))");
 }
 
 {
-    let expr = new ExprList([
-        new ExprSymbol("cond"),
-        new ExprList([
-            new ExprList([
-                new ExprSymbol("atom"),
-                new ExprList([
-                    new ExprSymbol("quote"),
-                    new ExprSymbol("a"),
-                ]),
-            ]),
-            new ExprList([
-                new ExprSymbol("quote"),
-                new ExprSymbol("first"),
-            ]),
-        ]),
-        new ExprList([
-            new ExprList([
-                new ExprSymbol("eq"),
-                new ExprList([
-                    new ExprSymbol("quote"),
-                    new ExprSymbol("a"),
-                ]),
-                new ExprList([
-                    new ExprSymbol("quote"),
-                    new ExprSymbol("b"),
-                ]),
-            ]),
-            new ExprList([
-                new ExprSymbol("quote"),
-                new ExprSymbol("second"),
-            ]),
-        ]),
-    ]);
+    let expr = parseToExpr("(cond ((atom 'a) 'first) ((eq 'a 'b) 'second))");
     let expected = new ValueSymbol("first");
     let actual = reduceFully(load(expr));
     is(expected, actual, "(cond ((atom 'a) 'first) ((eq 'a 'b) 'second))");
 }
 
 {
-    let expr = new ExprList([
-        new ExprSymbol("cond"),
-        new ExprList([
-            new ExprList([
-                new ExprSymbol("eq"),
-                new ExprList([
-                    new ExprSymbol("quote"),
-                    new ExprSymbol("a"),
-                ]),
-                new ExprList([
-                    new ExprSymbol("quote"),
-                    new ExprSymbol("b"),
-                ]),
-            ]),
-            new ExprList([
-                new ExprSymbol("quote"),
-                new ExprSymbol("huh"),
-            ]),
-        ]),
-    ]);
+    let expr = parseToExpr("(cond ((eq 'a 'b) 'huh))");
     let expected = new ValueSymbol("exception");
     let actual = new ValueSymbol("no exception");
     try {
@@ -1038,28 +861,7 @@ function is(expected: Value, actual: Value, message: string): void {
 }
 
 {
-    let expr = new ExprList([
-        new ExprList([
-            new ExprSymbol("lambda"),
-            new ExprList([
-                new ExprSymbol("x"),
-            ]),
-            new ExprList([
-                new ExprSymbol("cons"),
-                new ExprSymbol("x"),
-                new ExprList([
-                    new ExprSymbol("quote"),
-                    new ExprList([
-                        new ExprSymbol("b"),
-                    ]),
-                ]),
-            ]),
-        ]),
-        new ExprList([
-            new ExprSymbol("quote"),
-            new ExprSymbol("a"),
-        ]),
-    ]);
+    let expr = parseToExpr("((lambda (x) (cons x '(b))) 'a)");
     let expected = new ValuePair(
         new ValueSymbol("a"),
         new ValuePair(
@@ -1072,35 +874,7 @@ function is(expected: Value, actual: Value, message: string): void {
 }
 
 {
-    let expr = new ExprList([
-        new ExprList([
-            new ExprSymbol("lambda"),
-            new ExprList([
-                new ExprSymbol("x"),
-                new ExprSymbol("y"),
-            ]),
-            new ExprList([
-                new ExprSymbol("cons"),
-                new ExprSymbol("x"),
-                new ExprList([
-                    new ExprSymbol("cdr"),
-                    new ExprSymbol("y"),
-                ]),
-            ]),
-        ]),
-        new ExprList([
-            new ExprSymbol("quote"),
-            new ExprSymbol("z"),
-        ]),
-        new ExprList([
-            new ExprSymbol("quote"),
-            new ExprList([
-                new ExprSymbol("a"),
-                new ExprSymbol("b"),
-                new ExprSymbol("c"),
-            ]),
-        ]),
-    ]);
+    let expr = parseToExpr("((lambda (x y) (cons x (cdr y))) 'z '(a b c))");
     let expected = new ValuePair(
         new ValueSymbol("z"),
         new ValuePair(
@@ -1116,38 +890,7 @@ function is(expected: Value, actual: Value, message: string): void {
 }
 
 {
-    let expr = new ExprList([
-        new ExprList([
-            new ExprSymbol("lambda"),
-            new ExprList([
-                new ExprSymbol("f"),
-            ]),
-            new ExprList([
-                new ExprSymbol("f"),
-                new ExprList([
-                    new ExprSymbol("quote"),
-                    new ExprList([
-                        new ExprSymbol("b"),
-                        new ExprSymbol("c"),
-                    ]),
-                ]),
-            ]),
-        ]),
-        new ExprList([
-            new ExprSymbol("lambda"),
-            new ExprList([
-                new ExprSymbol("x"),
-            ]),
-            new ExprList([
-                new ExprSymbol("cons"),
-                new ExprList([
-                    new ExprSymbol("quote"),
-                    new ExprSymbol("a"),
-                ]),
-                new ExprSymbol("x"),
-            ]),
-        ]),
-    ]);
+    let expr = parseToExpr("((lambda (f) (f '(b c))) (lambda (x) (cons 'a x)))");
     let expected = new ValuePair(
         new ValueSymbol("a"),
         new ValuePair(
