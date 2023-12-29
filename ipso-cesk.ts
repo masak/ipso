@@ -3,6 +3,7 @@ export type Value =
     | ValueEmptyList
     | ValueFunction
     | ValuePair
+    | ValuePrimitive
     | ValueUnthinkable;
 
 export class ValueSymbol {
@@ -42,11 +43,30 @@ export class ValuePair {
     }
 }
 
+export class ValuePrimitive {
+    constructor(public name: string) {
+    }
+
+    toString(): string {
+        return `<primitive ${this.name}>`;
+    }
+}
+
 export class ValueUnthinkable {
     toString(): string {
         return `<unthinkable>`;
     }
 }
+
+export const PRIM_ATOM = new ValuePrimitive("atom");
+export const PRIM_CAR = new ValuePrimitive("car");
+export const PRIM_CDR = new ValuePrimitive("cdr");
+export const PRIM_COND = new ValuePrimitive("cond");
+export const PRIM_CONS = new ValuePrimitive("cons");
+export const PRIM_EQ = new ValuePrimitive("eq");
+export const PRIM_LABEL = new ValuePrimitive("label");
+export const PRIM_LAMBDA = new ValuePrimitive("lambda");
+export const PRIM_QUOTE = new ValuePrimitive("quote");
 
 function parseToValue(input: string): Value {
     let worklist: Array<Array<Value>> = [[]];
@@ -119,9 +139,7 @@ class EnvCons {
     }
 }
 
-export function emptyEnv(): Env {
-    return new EnvNil();
-}
+export const emptyEnv = new EnvNil();
 
 export function extendEnv(env: Env, variableName: string, value: Value): Env {
     return new EnvCons(variableName, value, env);
@@ -140,7 +158,7 @@ export function envLookup(env: Env, variableName: string): Value {
         }
         env = env.tail;
     }
-    throw new Error("Precondition failed: no such variable");
+    throw new Error(`Precondition failed: no such variable '${variableName}'`);
 }
 
 export function tryLookup(env: Env, variableName: string): boolean {
@@ -179,6 +197,23 @@ export function recklesslyClobberBinding(
     }
     throw new Error("Precondition failed: no such variable");
 }
+
+const standardEnvBindings: Array<[string, Value]> = [
+    ["atom", PRIM_ATOM],
+    ["car", PRIM_CAR],
+    ["cdr", PRIM_CDR],
+    ["cond", PRIM_COND],
+    ["cons", PRIM_CONS],
+    ["eq", PRIM_EQ],
+    ["label", PRIM_LABEL],
+    ["lambda", PRIM_LAMBDA],
+    ["quote", PRIM_QUOTE],
+];
+
+export const standardEnv = standardEnvBindings.reduce(
+    (env, [name, value]) => extendEnv(env, name, value),
+    emptyEnv,
+);
 
 export type Expr =
     | ExprSymbol
@@ -402,7 +437,7 @@ function zip<T, U>(ts: Array<T>, us: Array<U>): Array<[T, U]> {
 }
 
 function load(expr: Expr): State {
-    return new PState(expr, emptyEnv(), new KontSucceed());
+    return new PState(expr, standardEnv, new KontSucceed());
 }
 
 function unload(state: RetState): Value {
@@ -455,131 +490,6 @@ function assertOperandCount(
     }
 }
 
-function handleSymbolOperator(
-    operator: ExprSymbol,
-    operands: Array<Expr>,
-    state: PState,
-): State {
-    if (tryLookup(state.env, operator.name)) {
-        let fn = envLookup(state.env, operator.name);
-        assertFunctionOfNParams(fn, operands.length);
-        return nextArgOrCall(fn, [], operands, state.env, state.kont);
-    }
-    else if (operator.name === "atom") {
-        assertOperandCount("atom", operands, 1, 1);
-        return new PState(
-            operands[0],
-            state.env,
-            new KontAtom(state.kont),
-        );
-    }
-    else if (operator.name === "car") {
-        assertOperandCount("car", operands, 1, 1);
-        return new PState(
-            operands[0],
-            state.env,
-            new KontCar(state.kont),
-        );
-    }
-    else if (operator.name === "cdr") {
-        assertOperandCount("cdr", operands, 1, 1);
-        return new PState(
-            operands[0],
-            state.env,
-            new KontCdr(state.kont),
-        );
-    }
-    else if (operator.name === "cond") {
-        assertOperandCount("cond", operands, 1, Infinity);
-        let pairOperands: Array<[Expr, Expr]> = [];
-        for (let operand of operands) {
-            if (!(operand instanceof ExprList)) {
-                throw new Error("Malformed 'cond': operands must be lists");
-            }
-            let es = operand.elements;
-            if (es.length !== 2) {
-                throw new Error(
-                    "Malformed 'cond': operand lists must be of length 2"
-                );
-            }
-            pairOperands.push([es[0], es[1]]);
-        }
-        return new PState(
-            pairOperands[0][0],
-            state.env,
-            new KontCond(
-                pairOperands[0][1],
-                state.env,
-                pairOperands.slice(1),
-                state.kont,
-            ),
-        );
-    }
-    else if (operator.name === "cons") {
-        assertOperandCount("cons", operands, 2, 2);
-        return new PState(
-            operands[0],
-            state.env,
-            new KontCons1(operands[1], state.env, state.kont),
-        )
-    }
-    else if (operator.name === "eq") {
-        assertOperandCount("eq", operands, 2, 2);
-        return new PState(
-            operands[0],
-            state.env,
-            new KontEq1(operands[1], state.env, state.kont),
-        );
-    }
-    else if (operator.name === "label") {
-        assertOperandCount("label", operands, 2, 2);
-        let labelSymbol = operands[0];
-        if (!(labelSymbol instanceof ExprSymbol)) {
-            throw new Error(`First operand to 'label' must be a symbol`);
-        }
-        let labelName = labelSymbol.name;
-        let extendedEnv = extendEnv(
-            state.env,
-            labelName,
-            new ValueUnthinkable(),
-        );
-        return new PState(
-            operands[1],
-            extendedEnv,
-            new KontLabel(labelName, extendedEnv, state.kont),
-        );
-    }
-    else if (operator.name === "lambda") {
-        assertOperandCount("lambda", operands, 2, 2);
-        let params = [];
-        let paramsOperand = operands[0];
-        if (!(paramsOperand instanceof ExprList)) {
-            throw new Error(
-                `Malformed 'lambda': first operand must be parameter list`
-            );
-        }
-        for (let paramExpr of paramsOperand.elements) {
-            if (!(paramExpr instanceof ExprSymbol)) {
-                throw new Error(
-                    `Malformed 'lambda' parameter: must be symbol`
-                );
-            }
-            params.push(paramExpr.name);
-        }
-        let body = operands[1];
-        let value = new ValueFunction(state.env, params, body);
-        return new RetState(new KontRetValue(value, state.kont));
-    }
-    else if (operator.name === "quote") {
-        assertOperandCount("quote", operands, 1, 1);
-        let value = quoteExpr(operands[0]);
-        return new RetState(new KontRetValue(value, state.kont));
-    }
-    else {
-        throw new Error(`Unbound variable ${operator.toString()}`);
-    }
-}
-
 function reducePState(state: PState): State {
     let expr = state.expr;
     if (expr instanceof ExprSymbol) {
@@ -596,20 +506,15 @@ function reducePState(state: PState): State {
         else {
             let operator = elements[0];
             let operands = elements.slice(1);
-            if (operator instanceof ExprSymbol) {
-                return handleSymbolOperator(operator, operands, state);
-            }
-            else {  // ExprList
-                return new PState(
-                    operator,
+            return new PState(
+                operator,
+                state.env,
+                new KontApp1(
+                    operands,
                     state.env,
-                    new KontApp1(
-                        operands,
-                        state.env,
-                        state.kont,
-                    ),
-                );
-            }
+                    state.kont,
+                ),
+            );
         }
     }
     else {
@@ -662,14 +567,128 @@ function reduceRetState(state: RetState): State {
     let value = retKont.value;
     let kont = retKont.tail;
     if (kont instanceof KontApp1) {
-        assertFunctionOfNParams(value, kont.args.length);
-        return nextArgOrCall(
-            value,
-            [],
-            kont.args,
-            kont.env,
-            kont.tail,
-        );
+        if (value === PRIM_ATOM) {
+            assertOperandCount("atom", kont.args, 1, 1);
+            return new PState(
+                kont.args[0],
+                kont.env,
+                new KontAtom(kont.tail),
+            );
+        }
+        else if (value === PRIM_CAR) {
+            assertOperandCount("car", kont.args, 1, 1);
+            return new PState(
+                kont.args[0],
+                kont.env,
+                new KontCar(kont.tail),
+            );
+        }
+        else if (value === PRIM_CDR) {
+            assertOperandCount("cdr", kont.args, 1, 1);
+            return new PState(
+                kont.args[0],
+                kont.env,
+                new KontCdr(kont.tail),
+            );
+        }
+        else if (value === PRIM_COND) {
+            assertOperandCount("cond", kont.args, 1, Infinity);
+            let pairOperands: Array<[Expr, Expr]> = [];
+            for (let operand of kont.args) {
+                if (!(operand instanceof ExprList)) {
+                    throw new Error(
+                        "Malformed 'cond': operands must be lists"
+                    );
+                }
+                let es = operand.elements;
+                if (es.length !== 2) {
+                    throw new Error(
+                        "Malformed 'cond': operand lists must be of length 2"
+                    );
+                }
+                pairOperands.push([es[0], es[1]]);
+            }
+            return new PState(
+                pairOperands[0][0],
+                kont.env,
+                new KontCond(
+                    pairOperands[0][1],
+                    kont.env,
+                    pairOperands.slice(1),
+                    kont.tail,
+                ),
+            );
+        }
+        else if (value === PRIM_CONS) {
+            assertOperandCount("cons", kont.args, 2, 2);
+            return new PState(
+                kont.args[0],
+                kont.env,
+                new KontCons1(kont.args[1], kont.env, kont.tail),
+            )
+        }
+        else if (value === PRIM_EQ) {
+            assertOperandCount("eq", kont.args, 2, 2);
+            return new PState(
+                kont.args[0],
+                kont.env,
+                new KontEq1(kont.args[1], kont.env, kont.tail),
+            );
+        }
+        else if (value === PRIM_LABEL) {
+            assertOperandCount("label", kont.args, 2, 2);
+            let labelSymbol = kont.args[0];
+            if (!(labelSymbol instanceof ExprSymbol)) {
+                throw new Error(`First operand to 'label' must be a symbol`);
+            }
+            let labelName = labelSymbol.name;
+            let extendedEnv = extendEnv(
+                kont.env,
+                labelName,
+                new ValueUnthinkable(),
+            );
+            return new PState(
+                kont.args[1],
+                extendedEnv,
+                new KontLabel(labelName, extendedEnv, kont.tail),
+            );
+        }
+        else if (value === PRIM_LAMBDA) {
+            assertOperandCount("lambda", kont.args, 2, 2);
+            let params = [];
+            let paramsOperand = kont.args[0];
+            if (!(paramsOperand instanceof ExprList)) {
+                throw new Error(
+                    `Malformed 'lambda': first operand must be parameter list`
+                );
+            }
+            for (let paramExpr of paramsOperand.elements) {
+                if (!(paramExpr instanceof ExprSymbol)) {
+                    throw new Error(
+                        `Malformed 'lambda' parameter: must be symbol`
+                    );
+                }
+                params.push(paramExpr.name);
+            }
+            let body = kont.args[1];
+            let value = new ValueFunction(kont.env, params, body);
+            return new RetState(new KontRetValue(value, kont.tail));
+        }
+        else if (value === PRIM_QUOTE) {
+            assertOperandCount("quote", kont.args, 1, 1);
+            let value = quoteExpr(kont.args[0]);
+            return new RetState(new KontRetValue(value, kont.tail));
+        }
+        else {
+            assertFunctionOfNParams(value, kont.args.length);
+            return nextArgOrCall(
+                value,
+                [],
+                kont.args,
+                kont.env,
+                kont.tail,
+            );
+        }
     }
     else if (kont instanceof KontApp2) {
         // sad Schlemiel :(
