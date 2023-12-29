@@ -53,7 +53,11 @@ export function tryLookup(env: Env, variableName: string): boolean {
 // surgically replace that one binding after evaluating the value (using
 // an environment which already had the binding, but set to an unthinkable
 // value).
-export function recklesslyClobberBinding(env: Env, variableName: string, value: Value): void {
+export function recklesslyClobberBinding(
+    env: Env,
+    variableName: string,
+    value: Value,
+): void {
     while (env instanceof EnvCons) {
         if (env.variableName === variableName) {
             if (!(env.value instanceof ValueUnthinkable)) {
@@ -378,8 +382,8 @@ export type State = PState | RetState;
 export class PState {
     constructor(
         public expr: Expr,
-        public env: Env = emptyEnv(),
-        public kont: PKont = new KontSucceed(),
+        public env: Env,
+        public kont: PKont,
     ) {
     }
 }
@@ -398,7 +402,7 @@ function zip<T, U>(ts: Array<T>, us: Array<U>): Array<[T, U]> {
 }
 
 function load(expr: Expr): State {
-    return new PState(expr);
+    return new PState(expr, emptyEnv(), new KontSucceed());
 }
 
 function unload(state: RetState): Value {
