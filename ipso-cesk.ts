@@ -180,96 +180,6 @@ function parseToValue(input: string): Value {
     return loneValue[0];
 }
 
-export type Env = EnvNil | EnvCons;
-
-class EnvNil {
-}
-
-class EnvCons {
-    constructor(
-        public variableName: string,
-        public value: Value,
-        public tail: Env,
-    ) {
-    }
-}
-
-export const emptyEnv = new EnvNil();
-
-export function extendEnv(env: Env, variableName: string, value: Value): Env {
-    return new EnvCons(variableName, value, env);
-}
-
-export function envLookup(env: Env, variableName: string): Value {
-    while (env instanceof EnvCons) {
-        if (env.variableName === variableName) {
-            let value = env.value;
-            if (value instanceof ValueUnthinkable) {
-                throw new Error(
-                    "Precondition failed: unthinkable value looked up"
-                );
-            }
-            return value;
-        }
-        env = env.tail;
-    }
-    throw new Error(`Precondition failed: no such variable '${variableName}'`);
-}
-
-export function tryLookup(env: Env, variableName: string): boolean {
-    while (env instanceof EnvCons) {
-        if (env.variableName === variableName) {
-            return true;
-        }
-        env = env.tail;
-    }
-    return false;
-}
-
-// A combination of envLookup and extendEnv, in that it finds an existing
-// binding, and overwrites its value. This is not a good thing to do in
-// general, but we only use it once, to "tie the knot" in a `label`
-// construct. We don't need to go all CESK just to do that; instead we
-// surgically replace that one binding after evaluating the value (using
-// an environment which already had the binding, but set to an unthinkable
-// value).
-export function recklesslyClobberBinding(
-    env: Env,
-    variableName: string,
-    value: Value,
-): void {
-    while (env instanceof EnvCons) {
-        if (env.variableName === variableName) {
-            if (!(env.value instanceof ValueUnthinkable)) {
-                throw new Error(
-                    "Precondition failed: clobbered value is thinkable"
-                );
-            }
-            env.value = value;
-            return;
-        }
-        env = env.tail;
-    }
-    throw new Error("Precondition failed: no such variable");
-}
-
-const standardEnvBindings: Array<[string, Value]> = [
-    ["atom", BIF_ATOM],
-    ["car", BIF_CAR],
-    ["cdr", BIF_CDR],
-    ["cond", FORM_COND],
-    ["cons", BIF_CONS],
-    ["eq", BIF_EQ],
-    ["label", FORM_LABEL],
-    ["lambda", FORM_LAMBDA],
-    ["quote", FORM_QUOTE],
-];
-
-export const standardEnv = standardEnvBindings.reduce(
-    (env, [name, value]) => extendEnv(env, name, value),
-    emptyEnv,
-);
-
 export type Expr =
     | ExprSymbol
     | ExprList;
@@ -366,6 +276,114 @@ function parseToExpr(input: string): Expr {
     }
     return loneExpr[0];
 }
+
+export type Env = EnvNil | EnvCons;
+
+class EnvNil {
+}
+
+class EnvCons {
+    constructor(
+        public variableName: string,
+        public value: Value,
+        public tail: Env,
+    ) {
+    }
+}
+
+export const emptyEnv = new EnvNil();
+
+export function extendEnv(env: Env, variableName: string, value: Value): Env {
+    return new EnvCons(variableName, value, env);
+}
+
+export function envLookup(env: Env, variableName: string): Value {
+    while (env instanceof EnvCons) {
+        if (env.variableName === variableName) {
+            let value = env.value;
+            if (value instanceof ValueUnthinkable) {
+                throw new Error(
+                    "Precondition failed: unthinkable value looked up"
+                );
+            }
+            return value;
+        }
+        env = env.tail;
+    }
+    throw new Error(`Precondition failed: no such variable '${variableName}'`);
+}
+
+export function tryLookup(env: Env, variableName: string): boolean {
+    while (env instanceof EnvCons) {
+        if (env.variableName === variableName) {
+            return true;
+        }
+        env = env.tail;
+    }
+    return false;
+}
+
+// A combination of envLookup and extendEnv, in that it finds an existing
+// binding, and overwrites its value. This is not a good thing to do in
+// general, but we only use it once, to "tie the knot" in a `label`
+// construct. We don't need to go all CESK just to do that; instead we
+// surgically replace that one binding after evaluating the value (using
+// an environment which already had the binding, but set to an unthinkable
+// value).
+export function recklesslyClobberBinding(
+    env: Env,
+    variableName: string,
+    value: Value,
+): void {
+    while (env instanceof EnvCons) {
+        if (env.variableName === variableName) {
+            if (!(env.value instanceof ValueUnthinkable)) {
+                throw new Error(
+                    "Precondition failed: clobbered value is thinkable"
+                );
+            }
+            env.value = value;
+            return;
+        }
+        env = env.tail;
+    }
+    throw new Error("Precondition failed: no such variable");
+}
+
+const standardEnvBindings: Array<[string, Value]> = [
+    ["atom", BIF_ATOM],
+    ["car", BIF_CAR],
+    ["cdr", BIF_CDR],
+    ["cond", FORM_COND],
+    ["cons", BIF_CONS],
+    ["eq", BIF_EQ],
+    ["label", FORM_LABEL],
+    ["lambda", FORM_LAMBDA],
+    ["quote", FORM_QUOTE],
+];
+
+export const standardEnv = (() => {
+    let env = standardEnvBindings.reduce(
+        (env, [name, value]) => extendEnv(env, name, value),
+        emptyEnv,
+    );
+    env = extendEnv(
+        env,
+        "cadr",
+        new ValueFunction(
+            env,
+            ["x"],
+            new ExprList([
+                new ExprSymbol("car"),
+                new ExprList([
+                    new ExprSymbol("cdr"),
+                    new ExprSymbol("x"),
+                ]),
+            ]),
+        ),
+    );
+    return env;
+})();
 
 export type Kont = PKont | RetKont;
 
@@ -744,6 +762,12 @@ export function reduceFully(state: State): Value {
     return unload(state);
 }
 
+export function evaluate(expr: Expr): Value {
+    let state = load(expr);
+    let value = reduceFully(state);
+    return value;
+}
+
 function isDeeply(expected: Value, actual: Value): boolean {
     if (expected instanceof ValueSymbol && actual instanceof ValueSymbol) {
         return expected.name === actual.name;
@@ -777,126 +801,126 @@ function is(expected: Value, actual: Value, message: string): void {
 {
     let expr = parseToExpr("(quote a)");
     let expected = parseToValue("a");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "(quote a)");
 }
 
 {
     let expr = parseToExpr("(quote (a b c))");
     let expected = parseToValue("(a b c)");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "(quote (a b c))");
 }
 
 {
     let expr = parseToExpr("(atom 'a)");
     let expected = parseToValue("t");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "(atom 'a)");
 }
 
 {
     let expr = parseToExpr("(atom '(a b c))");
     let expected = parseToValue("()");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "(atom '(a b c))");
 }
 
 {
     let expr = parseToExpr("(atom '())");
     let expected = parseToValue("t");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "(atom '())");
 }
 
 {
     let expr = parseToExpr("(atom (atom 'a))");
     let expected = parseToValue("t");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "(atom (atom 'a))");
 }
 
 {
     let expr = parseToExpr("(atom '(atom 'a))");
     let expected = parseToValue("()");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "(atom '(atom 'a))");
 }
 
 {
     let expr = parseToExpr("(eq 'a 'a)");
     let expected = parseToValue("t");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "(eq 'a 'a)");
 }
 
 {
     let expr = parseToExpr("(eq 'a 'b)");
     let expected = parseToValue("()");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "(eq 'a 'b)");
 }
 
 {
     let expr = parseToExpr("(eq '() '())");
     let expected = parseToValue("t");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "(eq '() '())");
 }
 
 {
     let expr = parseToExpr("(car '(a b c))");
     let expected = parseToValue("a");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "(car '(a b c))");
 }
 
 {
     let expr = parseToExpr("(cdr '(a b c))");
     let expected = parseToValue("(b c)");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "(cdr '(a b c))");
 }
 
 {
     let expr = parseToExpr("(cons 'a '(b c))");
     let expected = parseToValue("(a b c)");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "(cons 'a '(b c))");
 }
 
 {
     let expr = parseToExpr("(cons 'a (cons 'b (cons 'c '())))");
     let expected = parseToValue("(a b c)");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "(cons 'a (cons 'b (cons 'c '())))");
 }
 
 {
     let expr = parseToExpr("(car (cons 'a '(b c)))");
     let expected = parseToValue("a");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "(car (cons 'a '(b c)))");
 }
 
 {
     let expr = parseToExpr("(cdr (cons 'a '(b c)))");
     let expected = parseToValue("(b c)");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "(cdr (cons 'a '(b c)))");
 }
 
 {
     let expr = parseToExpr("(cond ((eq 'a 'b) 'first) ((atom 'a) 'second))");
     let expected = parseToValue("second");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "(cond ((eq 'a 'b) 'first) ((atom 'a) 'second))");
 }
 
 {
     let expr = parseToExpr("(cond ((atom 'a) 'first) ((eq 'a 'b) 'second))");
     let expected = parseToValue("first");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "(cond ((atom 'a) 'first) ((eq 'a 'b) 'second))");
 }
 
@@ -905,7 +929,7 @@ function is(expected: Value, actual: Value, message: string): void {
     let expected = parseToValue("exception");
     let actual = parseToValue("(no exception)");
     try {
-        reduceFully(load(expr));
+        evaluate(expr);
     }
     catch {
         actual = parseToValue("exception");
@@ -916,14 +940,14 @@ function is(expected: Value, actual: Value, message: string): void {
 {
     let expr = parseToExpr("((lambda (x) (cons x '(b))) 'a)");
     let expected = parseToValue("(a b)");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "((lambda (x) (cons x '(b))) 'a)");
 }
 
 {
     let expr = parseToExpr("((lambda (x y) (cons x (cdr y))) 'z '(a b c))");
     let expected = parseToValue("(z b c)");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "((lambda (x y) (cons x (cdr y))) 'z '(a b c))");
 }
 
@@ -932,7 +956,7 @@ function is(expected: Value, actual: Value, message: string): void {
         "((lambda (f) (f '(b c))) (lambda (x) (cons 'a x)))"
     );
     let expected = parseToValue("(a b c)");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "((lambda (f) (f '(b c))) (lambda (x) (cons 'a x)))");
 }
 
@@ -947,6 +971,13 @@ function is(expected: Value, actual: Value, message: string): void {
          'm 'b '(a b (a b c) d))
     `);
     let expected = parseToValue("(a m (a m c) d)");
-    let actual = reduceFully(load(expr));
+    let actual = evaluate(expr);
     is(expected, actual, "((label subst ...) 'm 'b ...)");
+}
+
+{
+    let expr = parseToExpr("(cadr '((a b) (c d) e))");
+    let expected = parseToValue("(c d)");
+    let actual = evaluate(expr);
+    is(expected, actual, "(cadr '((a b) (c d) e))");
 }
