@@ -384,6 +384,7 @@ export const standardEnv = (() => {
         emptyEnv,
     );
     env = addBuiltin(env, "cadr", "(x)", "(car (cdr x))");
+    env = addBuiltin(env, "caddr", "(x)", "(car (cdr (cdr x)))");
     return env;
 })();
 
@@ -982,4 +983,11 @@ function is(expected: Value, actual: Value, message: string): void {
     let expected = parseToValue("(c d)");
     let actual = evaluate(expr);
     is(expected, actual, "(cadr '((a b) (c d) e))");
+}
+
+{
+    let expr = parseToExpr("(caddr '((a b) (c d) e))");
+    let expected = parseToValue("e");
+    let actual = evaluate(expr);
+    is(expected, actual, "(caddr '((a b) (c d) e))");
 }
