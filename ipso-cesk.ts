@@ -7,10 +7,15 @@ export type Value =
     | ValueSymbol
     | ValueUnthinkable;
 
+export class Varargs {
+}
+
+export const VARARGS = new Varargs();
+
 export class ValueBuiltinFunction {
     constructor(
         public name: string,
-        public paramCount: number,
+        public paramCount: number | Varargs,
         public body: (args: Array<Value>) => Value,
     ) {
     }
@@ -386,6 +391,14 @@ export const standardEnv = (() => {
     env = addBuiltin(env, "cadr", "(x)", "(car (cdr x))");
     env = addBuiltin(env, "caddr", "(x)", "(car (cdr (cdr x)))");
     env = addBuiltin(env, "cdar", "(x)", "(cdr (car x))");
+    env = extendEnv(env, "list", new ValueBuiltinFunction(
+        "list",
+        VARARGS,
+        (args) => args.reduceRight(
+            (cdr, car) => new ValuePair(car, cdr),
+            new ValueEmptyList(),
+        ),
+    ));
     return env;
 })();
 
@@ -571,7 +584,7 @@ function assertFunctionOfNParams(
         }
     }
     else if (value instanceof ValueBuiltinFunction) {
-        if (value.paramCount !== n) {
+        if (value.paramCount !== VARARGS && value.paramCount !== n) {
             throw new Error(
                 `Built-in function '${value.name}' expected ` +
                 `${value.paramCount} arguments,` +
@@ -998,4 +1011,11 @@ function is(expected: Value, actual: Value, message: string): void {
     let expected = parseToValue("(b)");
     let actual = evaluate(expr);
     is(expected, actual, "(cdar '((a b) (c d) e))");
+}
+
+{
+    let expr = parseToExpr("(list 'a 'b 'c)");
+    let expected = parseToValue("(a b c)");
+    let actual = evaluate(expr);
+    is(expected, actual, "(list 'a 'b 'c)");
 }
