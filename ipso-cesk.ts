@@ -386,7 +386,12 @@ function addFunction(
         throw new Error("Precondition failed: params must be list or symbol");
     }
     let fnValue = new ValueFunction(env, paramsArrayOrString, bodyExpr);
-    return extendEnv(env, name, fnValue);
+    let extendedEnv = extendEnv(env, name, fnValue);
+    // Yes, we monkey-patch the environment; since this is a function no-one's
+    // ever seen or invoked, it's morally OK, or at least not observably evil.
+    // This is what makes `append` below work, which calls itself.
+    fnValue.env = extendedEnv;
+    return extendedEnv;
 }
 
 export const standardEnv = (() => {
@@ -406,6 +411,10 @@ export const standardEnv = (() => {
     env = addFunction(env, "not", "(x)", `
         (cond (x '())
               ('t 't))
+    `);
+    env = addFunction(env, "append", "(x y)", `
+        (cond ((null x) y)
+              ('t (cons (car x) (append (cdr x) y))))
     `);
     return env;
 })();
@@ -1080,4 +1089,18 @@ function is(expected: Value, actual: Value, message: string): void {
     let expected = parseToValue("t");
     let actual = evaluate(expr);
     is(expected, actual, "(not (eq 'a 'b))");
+}
+
+{
+    let expr = parseToExpr("(append '(a b) '(c d))");
+    let expected = parseToValue("(a b c d)");
+    let actual = evaluate(expr);
+    is(expected, actual, "(append '(a b) '(c d))");
+}
+
+{
+    let expr = parseToExpr("(append '() '(c d))");
+    let expected = parseToValue("(c d)");
+    let actual = evaluate(expr);
+    is(expected, actual, "(append '() '(c d))");
 }
