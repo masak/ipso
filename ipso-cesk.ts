@@ -409,9 +409,11 @@ export const standardEnv = (() => {
         emptyEnv,
     );
     env = add(env, [
+        ["caar", "(x)", "(car (car x))"],
         ["cadr", "(x)", "(car (cdr x))"],
-        ["caddr", "(x)", "(car (cdr (cdr x)))"],
         ["cdar", "(x)", "(cdr (car x))"],
+        ["caddr", "(x)", "(car (cdr (cdr x)))"],
+        ["cadar", "(x)", "(car (cdr (car x)))"],
         ["list", "args", "args"],
         ["null", "(x)", "(eq x '())"],
         ["and", "(x y)", `
@@ -431,6 +433,10 @@ export const standardEnv = (() => {
                 ((and (not (atom x)) (not (atom y)))
                 (cons (list (car x) (car y))
                         (zip (cdr x) (cdr y)))))
+        `],
+        ["assoc", "(x y)", `
+            (cond ((eq (caar y) x) (cadar y))
+                  ('t (assoc x (cdr y))))
         `],
     ]);
     return env;
@@ -1127,4 +1133,18 @@ function is(expected: Value, actual: Value, message: string): void {
     let expected = parseToValue("((x a) (y b) (z c))");
     let actual = evaluate(expr);
     is(expected, actual, "(zip '(x y z) '(a b c))");
+}
+
+{
+    let expr = parseToExpr("(assoc 'x '((x a) (y b)))");
+    let expected = parseToValue("a");
+    let actual = evaluate(expr);
+    is(expected, actual, "(assoc 'x '((x a) (y b)))");
+}
+
+{
+    let expr = parseToExpr("(assoc 'x '((x new) (x a) (y b)))");
+    let expected = parseToValue("new");
+    let actual = evaluate(expr);
+    is(expected, actual, "(assoc 'x '((x new) (x a) (y b)))");
 }
