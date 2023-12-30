@@ -7,15 +7,10 @@ export type Value =
     | ValueSymbol
     | ValueUnthinkable;
 
-export class Varargs {
-}
-
-export const VARARGS = new Varargs();
-
 export class ValueBuiltinFunction {
     constructor(
         public name: string,
-        public paramCount: number | Varargs,
+        public paramCount: number,
         public body: (args: Array<Value>) => Value,
     ) {
     }
@@ -34,7 +29,7 @@ export class ValueEmptyList {
 export class ValueFunction {
     constructor(
         public env: Env,
-        public params: Array<string>,
+        public params: Array<string> | string,
         public body: Expr,
     ) {
     }
@@ -374,17 +369,23 @@ function addFunction(
     body: string,
 ): Env {
     let paramsExpr = parseToExpr(params);
-    if (!(paramsExpr instanceof ExprList)) {
-        throw new Error("Precondition failed: param list must be a list");
-    }
-    let paramsArray = paramsExpr.elements.map((elem) => {
-        if (!(elem instanceof ExprSymbol)) {
-            throw new Error("Precondition failed: parameter must be symbol");
-        }
-        return elem.name;
-    });
     let bodyExpr = parseToExpr(body);
-    let fnValue = new ValueFunction(env, paramsArray, bodyExpr);
+    let paramsArrayOrString: Array<string> | string;
+    if (paramsExpr instanceof ExprList) {
+        paramsArrayOrString = paramsExpr.elements.map((elem) => {
+            if (!(elem instanceof ExprSymbol)) {
+                throw new Error("Precondition failed: parameter must be symbol");
+            }
+            return elem.name;
+        });
+    }
+    else if (paramsExpr instanceof ExprSymbol) {
+        paramsArrayOrString = paramsExpr.name;
+    }
+    else {
+        throw new Error("Precondition failed: params must be list or symbol");
+    }
+    let fnValue = new ValueFunction(env, paramsArrayOrString, bodyExpr);
     return extendEnv(env, name, fnValue);
 }
 
@@ -396,14 +397,7 @@ export const standardEnv = (() => {
     env = addFunction(env, "cadr", "(x)", "(car (cdr x))");
     env = addFunction(env, "caddr", "(x)", "(car (cdr (cdr x)))");
     env = addFunction(env, "cdar", "(x)", "(cdr (car x))");
-    env = extendEnv(env, "list", new ValueBuiltinFunction(
-        "list",
-        VARARGS,
-        (args) => args.reduceRight(
-            (cdr, car) => new ValuePair(car, cdr),
-            new ValueEmptyList(),
-        ),
-    ));
+    env = addFunction(env, "list", "args", "args");
     return env;
 })();
 
@@ -581,7 +575,8 @@ function assertFunctionOfNParams(
     n: number,
 ): asserts value is ValueFunction | ValueBuiltinFunction {
     if (value instanceof ValueFunction) {
-        if (value.params.length !== n) {
+        let params = value.params;
+        if (typeof params !== "string" && params.length !== n) {
             throw new Error(
                 `Function expected ${value.params.length} arguments,` +
                 ` called with ${n}`
@@ -589,7 +584,7 @@ function assertFunctionOfNParams(
         }
     }
     else if (value instanceof ValueBuiltinFunction) {
-        if (value.paramCount !== VARARGS && value.paramCount !== n) {
+        if (value.paramCount !== n) {
             throw new Error(
                 `Built-in function '${value.name}' expected ` +
                 `${value.paramCount} arguments,` +
@@ -612,9 +607,20 @@ function nextArgOrCall(
     let i = argValues.length;
     if (i === args.length) {
         if (fn instanceof ValueFunction) {
+            let params = fn.params;
             let bodyEnv = fn.env;
-            for (let [paramName, arg] of zip(fn.params, argValues)) {
-                bodyEnv = extendEnv(bodyEnv, paramName, arg);
+            if (typeof params === "string") {
+                let paramName = params;
+                let argConsList = argValues.reduceRight(
+                    (cdr, car) => new ValuePair(car, cdr),
+                    new ValueEmptyList(),
+                );
+                bodyEnv = extendEnv(bodyEnv, paramName, argConsList);
+            }
+            else {  // array
+                for (let [paramName, arg] of zip(params, argValues)) {
+                    bodyEnv = extendEnv(bodyEnv, paramName, arg);
+                }
             }
             return new PState(fn.body, bodyEnv, tail);
         }
