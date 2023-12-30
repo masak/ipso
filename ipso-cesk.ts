@@ -367,7 +367,12 @@ const standardEnvBindings: Array<[string, Value]> = [
     ["quote", FORM_QUOTE],
 ];
 
-function addBuiltin(env: Env, name: string, params: string, body: string): Env {
+function addFunction(
+    env: Env,
+    name: string,
+    params: string,
+    body: string,
+): Env {
     let paramsExpr = parseToExpr(params);
     if (!(paramsExpr instanceof ExprList)) {
         throw new Error("Precondition failed: param list must be a list");
@@ -388,9 +393,9 @@ export const standardEnv = (() => {
         (env, [name, value]) => extendEnv(env, name, value),
         emptyEnv,
     );
-    env = addBuiltin(env, "cadr", "(x)", "(car (cdr x))");
-    env = addBuiltin(env, "caddr", "(x)", "(car (cdr (cdr x)))");
-    env = addBuiltin(env, "cdar", "(x)", "(cdr (car x))");
+    env = addFunction(env, "cadr", "(x)", "(car (cdr x))");
+    env = addFunction(env, "caddr", "(x)", "(car (cdr (cdr x)))");
+    env = addFunction(env, "cdar", "(x)", "(cdr (car x))");
     env = extendEnv(env, "list", new ValueBuiltinFunction(
         "list",
         VARARGS,
