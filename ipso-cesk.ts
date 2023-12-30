@@ -398,6 +398,7 @@ export const standardEnv = (() => {
     env = addFunction(env, "caddr", "(x)", "(car (cdr (cdr x)))");
     env = addFunction(env, "cdar", "(x)", "(cdr (car x))");
     env = addFunction(env, "list", "args", "args");
+    env = addFunction(env, "null", "(x)", "(eq x '())");
     return env;
 })();
 
@@ -1029,4 +1030,18 @@ function is(expected: Value, actual: Value, message: string): void {
     let expected = parseToValue("(a b c)");
     let actual = evaluate(expr);
     is(expected, actual, "(list 'a 'b 'c)");
+}
+
+{
+    let expr = parseToExpr("(null 'a)");
+    let expected = parseToValue("()");
+    let actual = evaluate(expr);
+    is(expected, actual, "(null 'a)");
+}
+
+{
+    let expr = parseToExpr("(null '())");
+    let expected = parseToValue("t");
+    let actual = evaluate(expr);
+    is(expected, actual, "(null '())");
 }
