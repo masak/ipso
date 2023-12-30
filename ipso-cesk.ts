@@ -394,34 +394,45 @@ function addFunction(
     return extendedEnv;
 }
 
+type FuncDef = [string, string, string];
+
+function add(env: Env, funcDefs: Array<FuncDef>): Env {
+    return funcDefs.reduce(
+        (prevEnv, [name, params, body]) => addFunction(prevEnv, name, params, body),
+        env,
+    );
+}
+
 export const standardEnv = (() => {
     let env = standardEnvBindings.reduce(
         (env, [name, value]) => extendEnv(env, name, value),
         emptyEnv,
     );
-    env = addFunction(env, "cadr", "(x)", "(car (cdr x))");
-    env = addFunction(env, "caddr", "(x)", "(car (cdr (cdr x)))");
-    env = addFunction(env, "cdar", "(x)", "(cdr (car x))");
-    env = addFunction(env, "list", "args", "args");
-    env = addFunction(env, "null", "(x)", "(eq x '())");
-    env = addFunction(env, "and", "(x y)", `
-        (cond (x (cond (y 't) ('t '())))
-              ('t '()))
-    `);
-    env = addFunction(env, "not", "(x)", `
-        (cond (x '())
-              ('t 't))
-    `);
-    env = addFunction(env, "append", "(x y)", `
-        (cond ((null x) y)
-              ('t (cons (car x) (append (cdr x) y))))
-    `);
-    env = addFunction(env, "zip", "(x y)", `
-        (cond ((and (null x) (null y)) '())
-              ((and (not (atom x)) (not (atom y)))
-               (cons (list (car x) (car y))
-                     (zip (cdr x) (cdr y)))))
-    `);
+    env = add(env, [
+        ["cadr", "(x)", "(car (cdr x))"],
+        ["caddr", "(x)", "(car (cdr (cdr x)))"],
+        ["cdar", "(x)", "(cdr (car x))"],
+        ["list", "args", "args"],
+        ["null", "(x)", "(eq x '())"],
+        ["and", "(x y)", `
+            (cond (x (cond (y 't) ('t '())))
+                ('t '()))
+        `],
+        ["not", "(x)", `
+            (cond (x '())
+                ('t 't))
+        `],
+        ["append", "(x y)", `
+            (cond ((null x) y)
+                ('t (cons (car x) (append (cdr x) y))))
+        `],
+        ["zip", "(x y)", `
+            (cond ((and (null x) (null y)) '())
+                ((and (not (atom x)) (not (atom y)))
+                (cons (list (car x) (car y))
+                        (zip (cdr x) (cdr y)))))
+        `],
+    ]);
     return env;
 })();
 
