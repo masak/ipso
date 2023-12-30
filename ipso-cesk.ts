@@ -416,6 +416,12 @@ export const standardEnv = (() => {
         (cond ((null x) y)
               ('t (cons (car x) (append (cdr x) y))))
     `);
+    env = addFunction(env, "zip", "(x y)", `
+        (cond ((and (null x) (null y)) '())
+              ((and (not (atom x)) (not (atom y)))
+               (cons (list (car x) (car y))
+                     (zip (cdr x) (cdr y)))))
+    `);
     return env;
 })();
 
@@ -1103,4 +1109,11 @@ function is(expected: Value, actual: Value, message: string): void {
     let expected = parseToValue("(c d)");
     let actual = evaluate(expr);
     is(expected, actual, "(append '() '(c d))");
+}
+
+{
+    let expr = parseToExpr("(zip '(x y z) '(a b c))");
+    let expected = parseToValue("((x a) (y b) (z c))");
+    let actual = evaluate(expr);
+    is(expected, actual, "(zip '(x y z) '(a b c))");
 }
