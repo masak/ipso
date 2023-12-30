@@ -1,9 +1,0 @@
-use Ipso;
-
-while prompt(">>> ") -> $_ {
-    say lisp($_);
-
-    CATCH { default { say .message } }
-}
-
-say "";
