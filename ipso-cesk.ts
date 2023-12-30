@@ -403,6 +403,10 @@ export const standardEnv = (() => {
         (cond (x (cond (y 't) ('t '())))
               ('t '()))
     `);
+    env = addFunction(env, "not", "(x)", `
+        (cond (x '())
+              ('t 't))
+    `);
     return env;
 })();
 
@@ -1062,4 +1066,18 @@ function is(expected: Value, actual: Value, message: string): void {
     let expected = parseToValue("()");
     let actual = evaluate(expr);
     is(expected, actual, "(and (atom 'a) (eq 'a 'b))");
+}
+
+{
+    let expr = parseToExpr("(not (eq 'a 'a))");
+    let expected = parseToValue("()");
+    let actual = evaluate(expr);
+    is(expected, actual, "(not (eq 'a 'a))");
+}
+
+{
+    let expr = parseToExpr("(not (eq 'a 'b))");
+    let expected = parseToValue("t");
+    let actual = evaluate(expr);
+    is(expected, actual, "(not (eq 'a 'b))");
 }
