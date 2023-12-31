@@ -13,12 +13,7 @@ import {
     ValueSymbol,
     ValueUnthinkable,
 } from "./value";
-import {
-    FORM_COND,
-    FORM_LABEL,
-    FORM_LAMBDA,
-    FORM_QUOTE,
-} from "./forms";
+import * as forms from "./forms";
 import {
     Env,
     envLookup,
@@ -170,7 +165,7 @@ function reduceRetState(state: RetState): State {
     let value = retKont.value;
     let kont = retKont.tail;
     if (kont instanceof KontApp1) {
-        if (value === FORM_COND) {
+        if (value === forms.cond) {
             assertOperandCount("cond", kont.args, 1, Infinity);
             let pairOperands: Array<[Expr, Expr]> = [];
             for (let operand of kont.args) {
@@ -198,7 +193,7 @@ function reduceRetState(state: RetState): State {
                 ),
             );
         }
-        else if (value === FORM_LABEL) {
+        else if (value === forms.label) {
             assertOperandCount("label", kont.args, 2, 2);
             let labelSymbol = kont.args[0];
             if (!(labelSymbol instanceof ExprSymbol)) {
@@ -216,7 +211,7 @@ function reduceRetState(state: RetState): State {
                 new KontLabel(labelName, extendedEnv, kont.tail),
             );
         }
-        else if (value === FORM_LAMBDA) {
+        else if (value === forms.lambda) {
             assertOperandCount("lambda", kont.args, 2, 2);
             let params = [];
             let paramsOperand = kont.args[0];
@@ -237,7 +232,7 @@ function reduceRetState(state: RetState): State {
             let value = new ValueFunction(kont.env, params, body);
             return new RetState(new KontRetValue(value, kont.tail));
         }
-        else if (value === FORM_QUOTE) {
+        else if (value === forms.quote) {
             assertOperandCount("quote", kont.args, 1, 1);
             let value = quoteExpr(kont.args[0]);
             return new RetState(new KontRetValue(value, kont.tail));

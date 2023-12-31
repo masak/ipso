@@ -5,7 +5,7 @@ import {
     ValueSymbol,
 } from "./value";
 
-export const BIF_ATOM = new ValueBuiltinFunction(
+const atom = new ValueBuiltinFunction(
     "atom",
     1,
     ([value]) =>
@@ -14,7 +14,7 @@ export const BIF_ATOM = new ValueBuiltinFunction(
             : new ValueEmptyList(),
 );
 
-export const BIF_CAR = new ValueBuiltinFunction(
+const car = new ValueBuiltinFunction(
     "car",
     1,
     ([value]) => {
@@ -25,7 +25,7 @@ export const BIF_CAR = new ValueBuiltinFunction(
     },
 );
 
-export const BIF_CDR = new ValueBuiltinFunction(
+const cdr = new ValueBuiltinFunction(
     "cdr",
     1,
     ([value]) => {
@@ -36,13 +36,13 @@ export const BIF_CDR = new ValueBuiltinFunction(
     },
 );
 
-export const BIF_CONS = new ValueBuiltinFunction(
+const cons = new ValueBuiltinFunction(
     "cons",
     2,
     ([car, cdr]) => new ValuePair(car, cdr),
 );
 
-export const BIF_EQ = new ValueBuiltinFunction(
+const eq = new ValueBuiltinFunction(
     "eq",
     2,
     ([x, y]) => {
@@ -55,4 +55,12 @@ export const BIF_EQ = new ValueBuiltinFunction(
             : new ValueEmptyList();
     },
 );
+
+export {
+    atom,
+    cons,
+    car,
+    cdr,
+    eq,
+};
 

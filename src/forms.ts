@@ -2,11 +2,15 @@ import {
     ValueSpecialForm,
 } from "./value";
 
-export const FORM_COND = new ValueSpecialForm("cond");
+const cond = new ValueSpecialForm("cond");
+const label = new ValueSpecialForm("label");
+const lambda = new ValueSpecialForm("lambda");
+const quote = new ValueSpecialForm("quote");
 
-export const FORM_LABEL = new ValueSpecialForm("label");
-
-export const FORM_LAMBDA = new ValueSpecialForm("lambda");
-
-export const FORM_QUOTE = new ValueSpecialForm("quote");
+export {
+    cond,
+    label,
+    lambda,
+    quote,
+};
 

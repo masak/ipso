@@ -16,33 +16,22 @@ import {
 import {
     parseToExpr,
 } from "./parse-expr";
-import {
-    BIF_ATOM,
-    BIF_CAR,
-    BIF_CDR,
-    BIF_CONS,
-    BIF_EQ,
-} from "./prims";
-import {
-    FORM_COND,
-    FORM_LABEL,
-    FORM_LAMBDA,
-    FORM_QUOTE,
-} from "./forms";
+import * as prims from "./prims";
+import * as forms from "./forms";
 import {
     zip,
 } from "./zip";
 
 const standardEnvBindings: Array<[string, Value]> = [
-    ["atom", BIF_ATOM],
-    ["car", BIF_CAR],
-    ["cdr", BIF_CDR],
-    ["cond", FORM_COND],
-    ["cons", BIF_CONS],
-    ["eq", BIF_EQ],
-    ["label", FORM_LABEL],
-    ["lambda", FORM_LAMBDA],
-    ["quote", FORM_QUOTE],
+    ["atom", prims.atom],
+    ["car", prims.car],
+    ["cdr", prims.cdr],
+    ["cond", forms.cond],
+    ["cons", prims.cons],
+    ["eq", prims.eq],
+    ["label", forms.label],
+    ["lambda", forms.lambda],
+    ["quote", forms.quote],
 ];
 
 function makeFunction(
