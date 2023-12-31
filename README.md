@@ -16,3 +16,10 @@ Blissfully ignoring the admonitions in
     >>> (eval '((lambda (x) (cons x '(b))) 'a) '())
     (a b)
 
+## Short-term plan
+
+* Make a REPL work in a web page
+* Change the 'eval' evaluator to compare values, not symbols
+* Change the 'eval' evaluator to pass function values, not lambda exprs
+* Change the 'eval' evaluator to accept varargs
+
