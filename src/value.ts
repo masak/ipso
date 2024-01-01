@@ -23,7 +23,7 @@ export class ValueBuiltinFunction {
     }
 
     toString(): string {
-        return `<builtin ${name}>`;
+        return `<builtin ${this.name}>`;
     }
 }
 
