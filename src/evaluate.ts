@@ -286,11 +286,11 @@ function reduceRetState(state: RetState): State {
     }
     else if (kont instanceof KontLabel) {
         // What morally justifies being reckless here is that we know
-        // we arrived at `value` without ever looking at the binding
+        // we arrived at `value` without ever looking at the bound value
         // in the extended environment. (If we did, we would have gotten
         // an error from envLookup.) We clobber the binding to have
-        // the intended binding; it's as if it always had that binding
-        // (in an impossible, time-travel kind of way). 
+        // the new value; it's as if it always had that value (in an
+        // impossible, time-travel kind of way). 
         recklesslyClobberBinding(kont.env, kont.name, value);
         return new RetState(new KontRetValue(value, kont.tail));
     }
