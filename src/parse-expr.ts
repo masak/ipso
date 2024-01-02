@@ -1,11 +1,12 @@
 import {
+    ALL_WHITESPACE,
+    TOKENIZER,
+} from "./tokenize";
+import {
     Expr,
     ExprList,
     ExprSymbol,
 } from "./expr";
-
-const TOKENIZER = /^(?:\s+|\(|\)|'|[\p{Letter}\p{Number}+\-*\/]+)/u;
-const ALL_WHITESPACE = /^\s+$/;
 
 function maybeWrapInQuote(expr: Expr, shouldWrap: boolean): Expr {
     return shouldWrap

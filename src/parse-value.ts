@@ -1,12 +1,13 @@
 import {
+    ALL_WHITESPACE,
+    TOKENIZER,
+} from "./tokenize";
+import {
     Value,
     ValueEmptyList,
     ValuePair,
     ValueSymbol,
 } from "./value";
-
-const TOKENIZER = /^(?:\s+|\(|\)|'|[\p{Letter}\p{Number}+\-*\/]+)/u;
-const ALL_WHITESPACE = /^\s+$/;
 
 export function parseToValue(input: string): Value {
     let worklist: Array<Array<Value>> = [[]];
