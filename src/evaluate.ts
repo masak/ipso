@@ -28,11 +28,11 @@ import {
     KontLabel,
     KontRetValue,
     KontSucceed,
+    RetKont,
 } from "./kont";
 import {
     load,
     PState,
-    RetState,
     State,
     unload,
 } from "./state";
@@ -66,7 +66,7 @@ function reduceOne(state: State): State {
         return reducePState(state);
     }
     else {
-        return reduceRetState(state);
+        return reduceRetKont(state);
     }
 }
 
@@ -92,7 +92,7 @@ function reducePState(state: PState): State {
         let env = state.env;
         let value = envLookup(env, expr.name);
         let kont = state.kont;
-        return new RetState(new KontRetValue(value, kont));
+        return new KontRetValue(value, kont);
     }
     else if (expr instanceof ExprList) {
         let elements = expr.elements;
@@ -148,7 +148,7 @@ function nextArgOrCall(
         }
         else {  // ValueBuiltinFunction
             let result = fn.body(argValues);
-            return new RetState(new KontRetValue(result, tail));
+            return new KontRetValue(result, tail);
         }
     }
     else {  // at least one more argument to evaluate
@@ -160,8 +160,7 @@ function nextArgOrCall(
     }
 }
 
-function reduceRetState(state: RetState): State {
-    let retKont = state.kont;
+function reduceRetKont(retKont: RetKont): State {
     let value = retKont.value;
     let kont = retKont.tail;
     if (kont instanceof KontApp1) {
@@ -230,12 +229,12 @@ function reduceRetState(state: RetState): State {
             }
             let body = kont.args[1];
             let value = new ValueFunction(kont.env, params, body);
-            return new RetState(new KontRetValue(value, kont.tail));
+            return new KontRetValue(value, kont.tail);
         }
         else if (value === forms.quote) {
             assertOperandCount("quote", kont.args, 1, 1);
             let value = quoteExpr(kont.args[0]);
-            return new RetState(new KontRetValue(value, kont.tail));
+            return new KontRetValue(value, kont.tail);
         }
         else {
             assertFunctionOfNParams(value, kont.args.length);
@@ -292,7 +291,7 @@ function reduceRetState(state: RetState): State {
         // the new value; it's as if it always had that value (in an
         // impossible, time-travel kind of way). 
         recklesslyClobberBinding(kont.env, kont.name, value);
-        return new RetState(new KontRetValue(value, kont.tail));
+        return new KontRetValue(value, kont.tail);
     }
     else if (kont instanceof KontSucceed) {
         throw new Error("Precondition broken: succeed within ret");
@@ -305,7 +304,7 @@ function reduceRetState(state: RetState): State {
 
 function reduceFully(state: State): Value {
     while (state instanceof PState ||
-        !(state.kont.tail instanceof KontSucceed)) {
+        !(state.tail instanceof KontSucceed)) {
 
         state = reduceOne(state);
     }
