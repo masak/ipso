@@ -78,6 +78,13 @@ _substitute it in directly_ in place of the `f`. That is, evaluation
 of `(f '(b c))` looks up `f` and delegates to evaluation of
 `((lambda (x) (cons 'a x)) '(b c))`.
 
+> If we were to understand program composition on the lexical level only,
+> there would be no apparent reason why the text representing a procedure
+> couldn't replace the text representing a variable before the compound
+> expression is executed.
+>
+> &mdash; "Sans-Papiers as First-Class Citizens", Julian Rohrhuber
+
 Let's call this approach the **textual** approach to first-class functions.
 It came as a surprised to me only because I've internalized and gotten
 used to the modern alternative, which we might call the **esoteric**
