@@ -86,3 +86,17 @@ test("(eval '((lambda ...) 'a '(b c d)) '())", (t) => {
     t.deepEqual(expected, actual);
 });
 
+test(
+    "(eval '((lambda (f) (f '(b c))) '(lambda (x) (cons 'a x))) '())",
+    (t) => {
+
+    let expr = parseToExpr(`
+        (eval '((lambda (f) (f '(b c)))
+                '(lambda (x) (cons 'a x)))
+              '())
+    `);
+    let expected = parseToValue("(a b c)");
+    let actual = evaluate(expr);
+    t.deepEqual(expected, actual);
+});
+
