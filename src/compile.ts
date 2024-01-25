@@ -31,6 +31,9 @@ import {
     RetKont,
 } from "./kont";
 import {
+    Runtime,
+} from "./run";
+import {
     load,
     PState,
     State,
@@ -61,12 +64,12 @@ function quoteExpr(expr: Expr): Value {
     }
 }
 
-function reduceOne(state: State): State {
+function reduceOne(state: State, runtime: Runtime): State {
     if (state instanceof PState) {
         return reducePState(state);
     }
     else {
-        return reduceRetKont(state);
+        return reduceRetKont(state, runtime);
     }
 }
 
@@ -125,6 +128,7 @@ function nextArgOrCall(
     args: Array<Expr>,
     env: Env,
     tail: Kont,
+    runtime: Runtime,
 ): State {
     let i = argValues.length;
     if (i === args.length) {
@@ -147,7 +151,7 @@ function nextArgOrCall(
             return new PState(fn.body, bodyEnv, tail);
         }
         else {  // ValueBuiltinFunction
-            let result = fn.body(argValues);
+            let result = runtime.runBuiltin(fn, argValues);
             return new KontRetValue(result, tail);
         }
     }
@@ -160,7 +164,7 @@ function nextArgOrCall(
     }
 }
 
-function reduceRetKont(retKont: RetKont): State {
+function reduceRetKont(retKont: RetKont, runtime: Runtime): State {
     let value = retKont.value;
     let kont = retKont.tail;
     if (kont instanceof KontApp1) {
@@ -244,6 +248,7 @@ function reduceRetKont(retKont: RetKont): State {
                 kont.args,
                 kont.env,
                 kont.tail,
+                runtime,
             );
         }
     }
@@ -256,6 +261,7 @@ function reduceRetKont(retKont: RetKont): State {
             kont.args,
             kont.env,
             kont.tail,
+            runtime,
         );
     }
     else if (kont instanceof KontCond) {
@@ -302,18 +308,19 @@ function reduceRetKont(retKont: RetKont): State {
     }
 }
 
-function reduceFully(state: State): Value {
+function reduceFully(state: State, runtime: Runtime): Value {
     while (state instanceof PState ||
         !(state.tail instanceof KontSucceed)) {
 
-        state = reduceOne(state);
+        state = reduceOne(state, runtime);
     }
     return unload(state);
 }
 
 export function evaluate(expr: Expr): Value {
     let state = load(expr);
-    let value = reduceFully(state);
+    let runtime = new Runtime();
+    let value = reduceFully(state, runtime);
     return value;
 }
 
