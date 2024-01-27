@@ -49,5 +49,13 @@ export class Runtime {
             throw new Error(`Unknown primitive: ${fn.name}`);
         }
     }
+
+    makeEmptyList() {
+        return new ValueEmptyList();
+    }
+
+    makeSymbol(name: string) {
+        return new ValueSymbol(name);
+    }
 }
 

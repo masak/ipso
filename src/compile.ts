@@ -13,6 +13,7 @@ import {
     ValueSymbol,
     ValueUnthinkable,
 } from "./value";
+import * as prims from "./prims";
 import * as forms from "./forms";
 import {
     Env,
@@ -43,19 +44,19 @@ import {
     zip,
 } from "./zip";
 
-function quoteExpr(expr: Expr): Value {
+function quoteExpr(expr: Expr, runtime: Runtime): Value {
     if (expr instanceof ExprSymbol) {
-        return new ValueSymbol(expr.name);
+        return runtime.makeSymbol(expr.name);
     }
     else if (expr instanceof ExprList) {
         let elements = expr.elements;
         if (elements.length === 0) {
-            return new ValueEmptyList();
+            return runtime.makeEmptyList();
         }
         else {
-            let head = quoteExpr(elements[0]);
-            let tail = quoteExpr(new ExprList(elements.slice(1)));
-            return new ValuePair(head, tail);
+            let head = quoteExpr(elements[0], runtime);
+            let tail = quoteExpr(new ExprList(elements.slice(1)), runtime);
+            return runtime.runBuiltin(prims.cons, [head, tail]);
         }
     }
     else {
@@ -237,7 +238,7 @@ function reduceRetKont(retKont: RetKont, runtime: Runtime): State {
         }
         else if (value === forms.quote) {
             assertOperandCount("quote", kont.args, 1, 1);
-            let value = quoteExpr(kont.args[0]);
+            let value = quoteExpr(kont.args[0], runtime);
             return new KontRetValue(value, kont.tail);
         }
         else {
