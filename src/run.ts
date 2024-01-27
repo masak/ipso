@@ -1,8 +1,15 @@
+import {
+    Env,
+} from "./env";
+import {
+    Expr,
+} from "./expr";
 import * as prims from "./prims";
 import {
     Value,
     ValueBuiltinFunction,
     ValueEmptyList,
+    ValueFunction,
     ValuePair,
     ValueSymbol,
 } from "./value";
@@ -52,6 +59,10 @@ export class Runtime {
 
     makeEmptyList() {
         return new ValueEmptyList();
+    }
+
+    makeFunction(env: Env, params: Array<string>, body: Expr) {
+        return new ValueFunction(env, params, body);
     }
 
     makeSymbol(name: string) {

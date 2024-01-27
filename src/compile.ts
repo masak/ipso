@@ -233,7 +233,7 @@ function reduceRetKont(retKont: RetKont, runtime: Runtime): State {
                 params.push(paramExpr.name);
             }
             let body = kont.args[1];
-            let value = new ValueFunction(kont.env, params, body);
+            let value = runtime.makeFunction(kont.env, params, body);
             return new KontRetValue(value, kont.tail);
         }
         else if (value === forms.quote) {
