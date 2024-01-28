@@ -17,7 +17,6 @@ import * as prims from "./prims";
 import * as forms from "./forms";
 import {
     Env,
-    envLookup,
     extendEnv,
     recklesslyClobberBinding,
 } from "./env";
@@ -67,7 +66,7 @@ function quoteExpr(expr: Expr, runtime: Runtime): Value {
 
 function reduceOne(state: State, runtime: Runtime): State {
     if (state instanceof PState) {
-        return reducePState(state);
+        return reducePState(state, runtime);
     }
     else {
         return reduceRetKont(state, runtime);
@@ -90,11 +89,11 @@ function assertOperandCount(
     }
 }
 
-function reducePState(state: PState): State {
+function reducePState(state: PState, runtime: Runtime): State {
     let expr = state.expr;
     if (expr instanceof ExprSymbol) {
         let env = state.env;
-        let value = envLookup(env, expr.name);
+        let value = runtime.lookupVariable(env, expr.name);
         let kont = state.kont;
         return new KontRetValue(value, kont);
     }

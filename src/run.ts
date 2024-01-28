@@ -1,5 +1,6 @@
 import {
     Env,
+    envLookup,
 } from "./env";
 import {
     Expr,
@@ -67,6 +68,10 @@ export class Runtime {
 
     makeSymbol(name: string) {
         return new ValueSymbol(name);
+    }
+
+    lookupVariable(env: Env, name: string): Value {
+        return envLookup(env, name);
     }
 }
 
