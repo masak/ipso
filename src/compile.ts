@@ -1,4 +1,7 @@
 import {
+    AbstractValue,
+} from "./abstract-value";
+import {
     Expr,
     ExprList,
     ExprSymbol,
@@ -24,6 +27,7 @@ import {
     Kont,
     KontApp1,
     KontApp2,
+    KontApp2Abstract,
     KontCond,
     KontLabel,
     KontRetValue,
@@ -43,7 +47,7 @@ import {
     zip,
 } from "./zip";
 
-function quoteExpr(expr: Expr, runtime: Runtime): Value {
+function quoteExpr(expr: Expr, runtime: Runtime): AbstractValue {
     if (expr instanceof ExprSymbol) {
         return runtime.makeSymbol(expr.name);
     }
@@ -124,15 +128,16 @@ function reducePState(state: PState, runtime: Runtime): State {
 
 function nextArgOrCall(
     fn: ValueFunction | ValueBuiltinFunction,
-    argValues: Array<Value>,
+    argAvals: Array<AbstractValue>,
     args: Array<Expr>,
     env: Env,
     tail: Kont,
     runtime: Runtime,
 ): State {
-    let i = argValues.length;
+    let i = argAvals.length;
     if (i === args.length) {
         if (fn instanceof ValueFunction) {
+            let argValues = runtime.executeAndGetValues(argAvals);
             let params = fn.params;
             let bodyEnv = fn.env;
             if (typeof params === "string") {
@@ -151,7 +156,7 @@ function nextArgOrCall(
             return new PState(fn.body, bodyEnv, tail);
         }
         else {  // ValueBuiltinFunction
-            let result = runtime.runBuiltin(fn, argValues);
+            let result = runtime.runBuiltin(fn, argAvals);
             return new KontRetValue(result, tail);
         }
     }
@@ -159,15 +164,15 @@ function nextArgOrCall(
         return new PState(
             args[i],
             env,
-            new KontApp2(fn, argValues, args, env, tail),
+            new KontApp2Abstract(fn, argAvals, args, env, tail),
         );
     }
 }
 
 function reduceRetKont(retKont: RetKont, runtime: Runtime): State {
-    let value = retKont.value;
     let kont = retKont.tail;
     if (kont instanceof KontApp1) {
+        let value = runtime.executePlan();
         if (value === forms.cond) {
             assertOperandCount("cond", kont.args, 1, Infinity);
             let pairOperands: Array<[Expr, Expr]> = [];
@@ -253,8 +258,12 @@ function reduceRetKont(retKont: RetKont, runtime: Runtime): State {
         }
     }
     else if (kont instanceof KontApp2) {
+        throw new Error("Precondition failure: KontApp2 in compiler");
+    }
+    else if (kont instanceof KontApp2Abstract) {
         // sad Schlemiel :(
-        let argValues = [...kont.argValues, value];
+        let aval = runtime.latestAbstractValue();
+        let argValues = [...kont.argValues, aval];
         return nextArgOrCall(
             kont.fn,
             argValues,
@@ -265,6 +274,7 @@ function reduceRetKont(retKont: RetKont, runtime: Runtime): State {
         );
     }
     else if (kont instanceof KontCond) {
+        let value = runtime.executePlan();
         let conditionIsTrue = value instanceof ValueSymbol &&
             value.name === "t";
         if (conditionIsTrue) {
@@ -290,6 +300,7 @@ function reduceRetKont(retKont: RetKont, runtime: Runtime): State {
         }
     }
     else if (kont instanceof KontLabel) {
+        let value = runtime.executePlan();
         // What morally justifies being reckless here is that we know
         // we arrived at `value` without ever looking at the bound value
         // in the extended environment. (If we did, we would have gotten
@@ -297,6 +308,7 @@ function reduceRetKont(retKont: RetKont, runtime: Runtime): State {
         // the new value; it's as if it always had that value (in an
         // impossible, time-travel kind of way). 
         recklesslyClobberBinding(kont.env, kont.name, value);
+        runtime.makeLabel(value);
         return new KontRetValue(value, kont.tail);
     }
     else if (kont instanceof KontSucceed) {
@@ -320,7 +332,8 @@ function reduceFully(state: State, runtime: Runtime): Value {
 export function evaluate(expr: Expr): Value {
     let state = load(expr);
     let runtime = new Runtime();
-    let value = reduceFully(state, runtime);
+    reduceFully(state, runtime);
+    let value = runtime.executePlan();
     return value;
 }
 
