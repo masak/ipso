@@ -1,7 +1,4 @@
 import {
-    AbstractValue,
-} from "./abstract-value";
-import {
     Value,
     ValueBuiltinFunction,
     ValueFunction,
@@ -18,7 +15,6 @@ export type Kont = PKont | RetKont;
 export type PKont =
     | KontApp1
     | KontApp2
-    | KontApp2Abstract
     | KontCond
     | KontLabel
     | KontSucceed;
@@ -39,17 +35,6 @@ export class KontApp2 {
     constructor(
         public fn: ValueFunction | ValueBuiltinFunction,
         public argValues: Array<Value>,
-        public args: Array<Expr>,
-        public env: Env,
-        public tail: Kont,
-    ) {
-    }
-}
-
-export class KontApp2Abstract {
-    constructor(
-        public fn: ValueFunction | ValueBuiltinFunction,
-        public argValues: Array<AbstractValue>,
         public args: Array<Expr>,
         public env: Env,
         public tail: Kont,

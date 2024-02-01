@@ -24,7 +24,6 @@ import {
     Kont,
     KontApp1,
     KontApp2,
-    KontApp2Abstract,
     KontCond,
     KontLabel,
     KontRetValue,
@@ -258,9 +257,6 @@ function reduceRetKont(retKont: RetKont): State {
             kont.env,
             kont.tail,
         );
-    }
-    else if (kont instanceof KontApp2Abstract) {
-        throw new Error("Precondition failure: KontApp2Abstract in evaluator");
     }
     else if (kont instanceof KontCond) {
         let conditionIsTrue = value instanceof ValueSymbol &&

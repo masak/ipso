@@ -26,7 +26,6 @@ import {
 import {
     Kont,
     KontApp1,
-    KontApp2,
     KontApp2Abstract,
     KontCond,
     KontLabel,
@@ -256,9 +255,6 @@ function reduceRetKont(retKont: RetKont, runtime: Runtime): State {
                 runtime,
             );
         }
-    }
-    else if (kont instanceof KontApp2) {
-        throw new Error("Precondition failure: KontApp2 in compiler");
     }
     else if (kont instanceof KontApp2Abstract) {
         // sad Schlemiel :(

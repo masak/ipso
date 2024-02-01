@@ -17,7 +17,6 @@ export type Kont = PKont | RetKont;
 
 export type PKont =
     | KontApp1
-    | KontApp2
     | KontApp2Abstract
     | KontCond
     | KontLabel
@@ -28,17 +27,6 @@ export type RetKont =
 
 export class KontApp1 {
     constructor(
-        public args: Array<Expr>,
-        public env: Env,
-        public tail: Kont,
-    ) {
-    }
-}
-
-export class KontApp2 {
-    constructor(
-        public fn: ValueFunction | ValueBuiltinFunction,
-        public argValues: Array<Value>,
         public args: Array<Expr>,
         public env: Env,
         public tail: Kont,
