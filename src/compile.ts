@@ -33,7 +33,7 @@ import {
     KontRetValue,
     KontSucceed,
     RetKont,
-} from "./kont";
+} from "./comp-kont";
 import {
     Runtime,
 } from "./run";
@@ -42,7 +42,7 @@ import {
     PState,
     State,
     unload,
-} from "./state";
+} from "./comp-state";
 import {
     zip,
 } from "./zip";
