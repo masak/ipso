@@ -26,7 +26,7 @@ import {
 import {
     Kont,
     KontApp1,
-    KontApp2Abstract,
+    KontApp2,
     KontCond,
     KontLabel,
     KontRetValue,
@@ -163,7 +163,7 @@ function nextArgOrCall(
         return new PState(
             args[i],
             env,
-            new KontApp2Abstract(fn, argAvals, args, env, tail),
+            new KontApp2(fn, argAvals, args, env, tail),
         );
     }
 }
@@ -256,7 +256,7 @@ function reduceRetKont(retKont: RetKont, runtime: Runtime): State {
             );
         }
     }
-    else if (kont instanceof KontApp2Abstract) {
+    else if (kont instanceof KontApp2) {
         // sad Schlemiel :(
         let aval = runtime.latestAbstractValue();
         let argValues = [...kont.argValues, aval];
