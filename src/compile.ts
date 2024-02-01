@@ -29,7 +29,7 @@ import {
     KontApp2,
     KontCond,
     KontLabel,
-    KontRetValue,
+    KontRet,
     KontSucceed,
     RetKont,
 } from "./comp-kont";
@@ -95,9 +95,9 @@ function reducePState(state: PState, runtime: Runtime): State {
     let expr = state.expr;
     if (expr instanceof ExprSymbol) {
         let env = state.env;
-        let value = runtime.lookupVariable(env, expr.name);
+        runtime.lookupVariable(env, expr.name);
         let kont = state.kont;
-        return new KontRetValue(value, kont);
+        return new KontRet(kont);
     }
     else if (expr instanceof ExprList) {
         let elements = expr.elements;
@@ -154,8 +154,8 @@ function nextArgOrCall(
             return new PState(fn.body, bodyEnv, tail);
         }
         else {  // ValueBuiltinFunction
-            let result = runtime.runBuiltin(fn, argAvals);
-            return new KontRetValue(result, tail);
+            runtime.runBuiltin(fn, argAvals);
+            return new KontRet(tail);
         }
     }
     else {  // at least one more argument to evaluate
@@ -235,13 +235,13 @@ function reduceRetKont(retKont: RetKont, runtime: Runtime): State {
                 params.push(paramExpr.name);
             }
             let body = kont.args[1];
-            let value = runtime.makeFunction(kont.env, params, body);
-            return new KontRetValue(value, kont.tail);
+            runtime.makeFunction(kont.env, params, body);
+            return new KontRet(kont.tail);
         }
         else if (value === forms.quote) {
             assertOperandCount("quote", kont.args, 1, 1);
-            let value = quoteExpr(kont.args[0], runtime);
-            return new KontRetValue(value, kont.tail);
+            quoteExpr(kont.args[0], runtime);
+            return new KontRet(kont.tail);
         }
         else {
             assertFunctionOfNParams(value, kont.args.length);
@@ -304,7 +304,7 @@ function reduceRetKont(retKont: RetKont, runtime: Runtime): State {
         // impossible, time-travel kind of way). 
         recklesslyClobberBinding(kont.env, kont.name, value);
         runtime.makeLabel(value);
-        return new KontRetValue(value, kont.tail);
+        return new KontRet(kont.tail);
     }
     else if (kont instanceof KontSucceed) {
         throw new Error("Precondition broken: succeed within ret");

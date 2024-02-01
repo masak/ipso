@@ -2,7 +2,6 @@ import {
     AbstractValue,
 } from "./abstract-value";
 import {
-    Value,
     ValueBuiltinFunction,
     ValueFunction,
 } from "./value";
@@ -23,7 +22,7 @@ export type PKont =
     | KontSucceed;
 
 export type RetKont =
-    | KontRetValue;
+    | KontRet;
 
 export class KontApp1 {
     constructor(
@@ -63,9 +62,8 @@ export class KontLabel {
 export class KontSucceed {
 }
 
-export class KontRetValue {
+export class KontRet {
     constructor(
-        public value: Value,
         public tail: PKont,
     ) {
     }

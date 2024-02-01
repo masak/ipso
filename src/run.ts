@@ -77,7 +77,6 @@ export class Runtime {
     makeFunction(env: Env, params: Array<string>, body: Expr) {
         let result = this.abstractValue();
         this.instrs.push(new InstrFunction(env, params, body, result));
-        return result;
     }
 
     makeSymbol(name: string) {
@@ -89,13 +88,11 @@ export class Runtime {
     makeLabel(value: Value) {
         let result = this.abstractValue();
         this.instrs.push(new InstrLabel(value, result));
-        return result;
     }
 
     lookupVariable(env: Env, name: string) {
         let result = this.abstractValue();
         this.instrs.push(new InstrLookup(env, name, result));
-        return result;
     }
 
     executePlan(): Value {
