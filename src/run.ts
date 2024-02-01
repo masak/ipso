@@ -55,6 +55,13 @@ export class Runtime {
         return new AbstractValue(this.abstractValueCounter - 1);
     }
 
+    latestValue(): Value {
+        if (this.values.size === 0) {
+            throw new Error("Precondition failed: no values");
+        }
+        return this.values.get(this.abstractValueCounter - 1)!;
+    }
+
     runBuiltin(fn: ValueBuiltinFunction, args: Array<AbstractValue>) {
         let result = this.abstractValue();
         this.instrs.push(new InstrBuiltin(fn, args, result));

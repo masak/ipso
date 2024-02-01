@@ -40,7 +40,6 @@ import {
     load,
     PState,
     State,
-    unload,
 } from "./comp-state";
 import {
     zip,
@@ -322,7 +321,7 @@ function reduceFully(state: State, runtime: Runtime): Value {
 
         state = reduceOne(state, runtime);
     }
-    return unload(state);
+    return runtime.latestValue();
 }
 
 export function evaluate(expr: Expr): Value {

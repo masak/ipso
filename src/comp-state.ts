@@ -2,9 +2,6 @@ import {
     Expr,
 } from "./expr";
 import {
-    Value,
-} from "./value";
-import {
     Env,
 } from "./env";
 import {
@@ -29,9 +26,5 @@ export class PState {
 
 export function load(expr: Expr): State {
     return new PState(expr, standardEnv, new KontSucceed());
-}
-
-export function unload(kont: RetKont): Value {
-    return kont.value;
 }
 
