@@ -131,7 +131,14 @@ do with lexical variable scope.
 
 ### Surprise 2: `defun` is not simply sugar for `label` + `lambda`
 
-...
+In the text, `defun` is introduced as being _exactly_ a `label` containing a
+`lambda`. This is good enough for making the name of the defined function
+visible inside the function's body itself, but it doesn't make the name
+visible after the function.
+
+Without that, a `defun` is pretty useless. My point is that some extra
+component is missing here; something like "affect the scope we're in by adding
+a new binding to it". But no.
 
 ### Surprise 3: Global scope and mutually recursive definitions
 
