@@ -99,20 +99,21 @@ approach. Let me show them side by side to compare them:
       operator position; that is, first in a form.
 * Esoteric approach:
     - On the passing side, _evaluate_ the `lambda`. This results in a
-      previously-unseen type of value which we'll call a _function object_.
-      The internal representation of a function object is not so constrained;
-      in particular, it may or may not be just a `lambda` form.
+      new type of value which we'll call a _function value_.
+      The internal representation of a function value is not set in stone;
+      in particular, it may or may not be just a textual `lambda` form.
     - On the usage side, always look up the operator name (choosing whether
       or not to hard-code the built-ins and special forms first); if the
-      value found is a function object, invoke it &mdash; that is, evaluate
+      value found is a function value, invoke it &mdash; that is, evaluate
       the operands, extend the environment with the resulting arguments,
       and evaluate the function value's body in the extended environment.
     - Consistent principle: just as there's a distinction between the
       _numeral_ "5" and the _number_ 5, there's a distinction between how
       you _write_ a function in code, and the underlying _value_ it
-      evaluates to.
-    - Consistent principle: `lambda` itself _already_ delays evaluation,
-      by wrapping code inside an abstraction. Using `quote` is superfluous.
+      represents/evaluates to.
+    - Consistent principle: `lambda` itself already "delays evaluation",
+      by wrapping its body inside an abstraction. Using `quote` is
+      superfluous.
 
 The esoteric approach has more moving parts (a new type of value) and takes
 more explaining, but as an idea it also has longer reach. The reason has to
