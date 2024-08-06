@@ -68,7 +68,7 @@ Let me quote the relevant part of "The Roots of Lisp":
 > ```
 
 It goes by really quickly, so let me just mention what threw me off this
-time: it was the apostrophe/quote sign before `(lambda (x) (cons 'a x))`
+time: it was the apostrophe/quote mark before `(lambda (x) (cons 'a x))`
 in that final example evaluation.
 
 It means that, when we pass a function (as the lambda in that example to
