@@ -86,7 +86,7 @@ of `(f '(b c))` looks up `f` and delegates to evaluation of
 > &mdash; "Sans-Papiers as First-Class Citizens", Julian Rohrhuber
 
 Let's call this approach the **textual** approach to first-class functions.
-It came as a surprised to me only because I've internalized and gotten
+It came as a surprise to me only because I've internalized and gotten
 used to the modern alternative, which we might call the **esoteric**
 approach. Let me show them side by side to compare them:
 
