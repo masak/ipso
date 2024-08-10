@@ -1,9 +1,9 @@
 _Res ipsa loquitur_ &mdash; Latin, meaning "the thing speaks for itself"
 
-Largely following the steps noted down in pg's
-[The Roots of Lisp](http://lib.store.yahoo.net/lib/paulgraham/jmc.ps).
-Blissfully ignoring the admonitions in
-[this axis-of-eval blog post](http://axisofeval.blogspot.com/2010/08/no-more-minimal-early-lisps-pulleezz.html).
+Largely following the steps noted down in pg's [The Roots of
+Lisp](http://slackwise.net/files/docs/The%20Roots%20of%20Lisp.pdf).
+Blissfully ignoring the admonitions in [this axis-of-eval blog
+post](http://axisofeval.blogspot.com/2010/08/no-more-minimal-early-lisps-pulleezz.html).
 
 ## Example REPL session
 
