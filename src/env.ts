@@ -39,16 +39,6 @@ export function envLookup(env: Env, variableName: string): Value {
     throw new Error(`Precondition failed: no such variable '${variableName}'`);
 }
 
-export function tryLookup(env: Env, variableName: string): boolean {
-    while (env instanceof EnvCons) {
-        if (env.variableName === variableName) {
-            return true;
-        }
-        env = env.tail;
-    }
-    return false;
-}
-
 // A combination of envLookup and extendEnv, in that it finds an existing
 // binding, and overwrites its value. This is not a good thing to do in
 // general, but we only use it once, to "tie the knot" in a `label`
