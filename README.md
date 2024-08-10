@@ -116,8 +116,7 @@ approach. Let me show them side by side to compare them:
       superfluous.
 
 The esoteric approach has more moving parts (a new type of value) and takes
-more explaining, but as an idea it also has longer reach. The reason has to
-do with lexical variable scope.
+more explaining, but as an idea it also has longer reach.
 
 > Each formalism implies a specific distinction between objects and the
 > system of their combination. Thereby, the concept of _function_ has a
@@ -128,20 +127,93 @@ do with lexical variable scope.
 >
 > &mdash; "Sans-Papiers as First-Class Citizens", Julian Rohrhuber
 
-...
+Of course, the textual approach becomes tightly associated with _dynamic
+lookup_ of variables, whereas the esoteric approach favors _static_ or _lexical
+lookup_. The reason is simple: in the textual approach, the only thing you can
+do is turn to the interpreter and ask it for the value of the variable. There's
+no function value with a corresponding scope-at-construction to consult;
+there's only the "current scope" of the interpreted process.
 
 ### Surprise 2: `defun` is not simply sugar for `label` + `lambda`
 
 In the text, `defun` is introduced as being _exactly_ a `label` containing a
 `lambda`. This is good enough for making the name of the defined function
 visible inside the function's body itself, but it doesn't make the name
-visible after the function.
+visible outside the function and after the definition.
 
 Without that, a `defun` is pretty useless. My point is that some extra
 component is missing here; something like "affect the scope we're in by adding
-a new binding to it". But no.
+a new binding to it". But no. This is what a definition _is_: an effectful
+action after which the scope of the definition has been extended with a new
+name and definiend. In "The Roots of Lisp", there is no primitive that does
+this.
 
 ### Surprise 3: Global scope and mutually recursive definitions
 
-...
+Let's say for argument's sake that we don't like the idea of destructively
+mutating the global environment, and so in order to support the issue
+identified in Surprise 2, we do the following: every time we interpret a
+`defun`, we (a) desugar it to a `label` and `lambda`, which takes care of
+recursive calls and other references inside the body of the function itself,
+and (b) create a new environment extended with this new definition, to use in
+subsequent REPL interactions, or in the rest of the Lisp file.
+
+This works fine for almost everything, but it doesn't handle mutually
+recursive functions. Consider this set of mutually recursive functions in Bel:
+
+```
+(def even (n)
+  (if (= n 0) t (odd (- n 1))))
+
+(def odd (n)
+  (if (= n 0) nil (even (- n 1))))
+```
+
+The fact that `odd` calls `even` is fine. But when `even` tries to call `odd`, 
+it won't find it in the environment in which `even` was defined, because
+temporally at that point `odd` _hasn't_ been defined yet. (Put differently,
+`even` gets bound using that older, smaller environment in which `odd` doesn't
+exist. At the time `odd` is defined, we update our running global environment,
+but we don't update the environment in which `even` was defined.)
+
+What we are forced to concede that we want is some kind of "reference cell
+semantics" for the global environment and for `defun`. Possibly also for
+smaller nested environments; whereas `lambda` and `let` are non-destructive
+extensions of an environment, `defun` is a destructive _update_ of an
+environment; a side-effect. The example with mutually recursive functions shows
+that this is in a sense what we expect.
+
+This is why the corresponding built-in operative `$define!` in Kernel has an
+exclamation mark in its name: because it destructively updates the evaluator's
+current environment.
+
+"The Roots of Lisp" needs another primitive like `update-environment` or
+something.
+
+This is not a theoretical quibble. pg's
+[jmc.lisp](https://sep.turbifycdn.com/ty/cdn/paulgraham/jmc.lisp?t=1688221954&)
+uses (Common Lisp's) `defun` all over the place without considering it one of
+his 7 primitives.
+
+> ```
+> ; The Lisp defined in McCarthy's 1960 paper, translated into CL.
+> ; Assumes only quote, atom, eq, cons, car, cdr, cond.
+> ```
+
+And then `eval.` and `evcon.` mutually depend on each other, which means that
+pg's code also makes use of this implicit undeclared `update-environment`
+primitive to work properly. Also `eval.` and `evlis.` mutually depend on each
+other.
+
+All this is fine! I'm not even complaining; but I think this shows the dangers
+Reynolds is talking about. Would you notice the implicit dependency on
+destructively updating the global environment unless it was pointed out
+explicitly?
+
+Of the seven primitives explicitly assumed, only `quote` and `cond` are
+"special", in the sense that their behavior in the evaluator is
+non-compositional and doesn't just involve evaluating all the operands and then
+acting on the results. Later, `label` and `lambda` get added to this list as
+well. But something like `update-environment` is also needed, if we want to
+fully describe the effects of `defun` in the object language.
 
