@@ -217,3 +217,105 @@ acting on the results. Later, `label` and `lambda` get added to this list as
 well. But something like `update-environment` is also needed, if we want to
 fully describe the effects of `defun` in the object language.
 
+## Compiling to an intermediate representation
+
+We take things in two big steps. The first, compiling to an intermediate
+representation, is about flattening some things, and highlighting the
+structural/nested aspects of other things.
+
+### Variable lookup
+
+A variable lookup in code has two parts:
+
+* The _static part_, where the variable lookup is resolved to the innermost
+  binder which defines it. The resulting lookup information, if successful,
+  is of the form "M steps out, slot number N".
+
+* The _dynamic part_, where a value is looked up using the "M steps out, slot
+  number N" information, together with an _environment_, a linked list of at
+  least N frames, the Nth of which has at least M slots.
+
+In case the static lookup is successful, we generate the instruction `lookup
+M, N`.
+
+In case it wasn't, we generate `error "Variable " ~ name ~ " not found"`.
+
+### Conditional
+
+A conditional has this form:
+
+```
+(cond c1 e1
+      c2 e2
+      ...
+      cN eN)
+```
+
+Equationally, this is equivalent to a simpler `if`:
+
+```
+(if c1 e1
+       (if c2 e2
+              ...
+              (if cN eN
+                     (error "Fell off cond"))))
+```
+
+Let's consider a single `if`:
+
+```
+(if c e-then e-else)
+```
+
+For the intermediate format, we use "label binders":
+
+```
+(fwd-label AFTER-IF
+  (fwd-label AFTER-THEN
+    (jump-unless-nil c AFTER-THEN)
+    e-then
+    (jump AFTER-IF))
+  e-else)
+```
+
+This is still a nested format, but it's much easier to generate linear
+bytecode from it, thanks to the named labels.
+
+### Function application
+
+A function application looks like this:
+
+```
+(f a1 a2 ... aN)
+```
+
+There are two challenges here:
+
+* In order to maintain a "flat" intermediate representation, we need to compute
+  all the arguments `a1 a2 ... aN`, and store them in temporary registers.
+
+* In order for the "call function" opcode to have bounded size, we need to
+  split up "preparing" the arguments from temporary registers, and making the
+  call itself.
+
+The resulting intermediate code looks something like this:
+
+```
+(set-slot r1 a1)
+(set-slot r2 a2)
+...
+(set-slot rN aN)
+(arguments
+  a1
+  a2
+  ...
+  aN)
+(call f)
+```
+
+### Lambda
+
+### Quote
+
+### Label
+
