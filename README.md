@@ -30,8 +30,9 @@ See [docs/three-surprises.md](./docs/three-surprises.md).
 ## Compiling to an intermediate representation
 
 We take things in two big steps. The first, compiling to an intermediate
-representation, is about flattening some things, and highlighting the
-structural/nested aspects of other things.
+representation. This makes some statically known or inferrable things clear
+in the code, and breaks it down into smaller steps. It's also straightforward
+to flatten the intermediate representation to bytecode later.
 
 ### Variable lookup
 
@@ -45,10 +46,10 @@ A variable lookup in code has two parts:
   number N" information, together with an _environment_, a linked list of at
   least N frames, the Nth of which has at least M slots.
 
-In case the static lookup is successful, we generate the instruction `lookup
-M, N`.
+In case the static lookup is successful, we generate `(lookup M N)`.
 
-In case it wasn't, we generate `error "Variable " ~ name ~ " not found"`.
+In case it wasn't, we generate `(error (concat "Variable " name
+" not found"))`.
 
 ### Quote
 
@@ -119,23 +120,18 @@ There are two challenges here:
 * In order to maintain a "flat" intermediate representation, we need to compute
   all the arguments `a1 a2 ... aN`, and store them in temporary registers.
 
-* In order for the "call function" opcode to have bounded size, we need to
-  split up "preparing" the arguments from temporary registers, and making the
-  call itself.
+* In order for the "call function" opcode to have bounded size, the call must
+  only make use of indexed slots, both for the function and all the arguments.
 
 The resulting intermediate code looks something like this:
 
 ```
-(set-slot r1 a1)
-(set-slot r2 a2)
+(set-slot sf f)
+(set-slot s1 a1)
+(set-slot s2 a2)
 ...
-(set-slot rN aN)
-(arguments
-  a1
-  a2
-  ...
-  aN)
-(call f)
+(set-slot sN aN)
+(call sf s1 s2 ... sN)
 ```
 
 ### Lambda
@@ -165,4 +161,21 @@ An expression `(label name expr)` generates the following:
 
 Where `expr` has been compiled in a new scope that binds `name` to its single
 slot.
+
+### Intermediate format instructions
+
+| Form                       | Type              |
+|============================|===================|
+| `(lookup M N)`             | `IrLookup`        |
+| `(error msg)`              | `IrError`         |
+| `(symbol index)`           | `IrSymbol`        |
+| `(empty-list)`             | `IrEmptyList`     |
+| `(cons e L)`               | `IrCons`          |
+| `(fwd-label lbl IR)`       | `IrFwdLabel`      |
+| `(jump-unless-nil e lbl)`  | `IrJumpUnlessNil` |
+| `(jump lbl)`               | `IrJump`          |
+| `(set-slot r e)`           | `IrSetSlot`       |
+| `(call sf s1 s2 ... sN)`   | `IrCall`          |
+| `(closure index)`          | `IrClosure`       |
+| `(rec e)`                  | `IrRec`           |
 
