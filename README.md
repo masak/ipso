@@ -179,3 +179,27 @@ slot.
 | `(closure index)`          | `IrClosure`       |
 | `(rec e)`                  | `IrRec`           |
 
+### Tail calls
+
+In fact, there's an easy addition we might as well make:
+
+| Form                          | Type              |
+|===============================|===================|
+| ...                           | ...               |
+| `(call sf s1 s2 ... sN)`      | `IrCall`          |
+| `(tail-call sf s1 s2 ... sN)` | `IrTailCall`      |
+| ...                           | ...               |
+
+The `tail-call` opcode is then used in _tail-call position_, which is defined
+inductively as follows:
+
+* Expressions at the end of a function definitions are in tail-call position.
+* If an `if` expression is in tail-call position, then both its "then" branch
+  expression and its "else" branch expression are also in tail-call position.
+
+Semantivally, a tail call eliminates the need to return to the current function
+activation after the function call to `sf` completes. Instead, we can return
+immediately to the current function's caller. In other words, tail calls can
+act more like "go to" instructions, because they give all the benefits of a
+function call but without growing the stack.
+
