@@ -165,7 +165,7 @@ slot.
 ### Intermediate format instructions
 
 | Form                       | Type              |
-|============================|===================|
+|----------------------------|-------------------|
 | `(lookup M N)`             | `IrLookup`        |
 | `(error msg)`              | `IrError`         |
 | `(symbol index)`           | `IrSymbol`        |
@@ -184,7 +184,7 @@ slot.
 In fact, there's an easy addition we might as well make:
 
 | Form                          | Type              |
-|===============================|===================|
+|-------------------------------|-------------------|
 | ...                           | ...               |
 | `(call sf s1 s2 ... sN)`      | `IrCall`          |
 | `(tail-call sf s1 s2 ... sN)` | `IrTailCall`      |
