@@ -113,7 +113,7 @@ bytecode from it, thanks to the named labels.
 A function application looks like this:
 
 ```
-(f a1 a2 ... aN)
+(closure-expr a1 a2 ... aN)
 ```
 
 There are two challenges here:
@@ -122,17 +122,18 @@ There are two challenges here:
   all the arguments `a1 a2 ... aN`, and store them in temporary registers.
 
 * In order for the "call function" opcode to have bounded size, the call must
-  only make use of indexed slots, both for the function and all the arguments.
+  only make use of indexed slots, both for the called closure and all the
+  arguments.
 
 The resulting intermediate code looks something like this:
 
 ```
-(set-slot sf f)
+(set-slot sc closure-expr)
 (set-slot s1 a1)
 (set-slot s2 a2)
 ...
 (set-slot sN aN)
-(call sf s1 s2 ... sN)
+(call sc s1 s2 ... sN)
 ```
 
 ### Lambda
@@ -149,8 +150,8 @@ impact. A closure has two parts:
 Importantly, the code part is compiled/prepared once, and can then be re-used
 with a different environment in each created closure.
 
-Generates as `(closure code)`, where `code` is an index into a global code
-registry. Again, the environment is supplied by the runtime.
+Generates as `(closure c)`, where `c` is an index into a global code registry.
+Again, the environment is supplied by the runtime.
 
 ### Label
 
@@ -169,15 +170,15 @@ slot.
 |----------------------------|-------------------|
 | `(lookup M N)`             | `IrLookup`        |
 | `(error msg)`              | `IrError`         |
-| `(symbol index)`           | `IrSymbol`        |
+| `(symbol sy)`              | `IrSymbol`        |
 | `(empty-list)`             | `IrEmptyList`     |
 | `(cons e L)`               | `IrCons`          |
 | `(fwd-label lbl IR)`       | `IrFwdLabel`      |
 | `(jump-unless-nil e lbl)`  | `IrJumpUnlessNil` |
 | `(jump lbl)`               | `IrJump`          |
 | `(set-slot r e)`           | `IrSetSlot`       |
-| `(call sf s1 s2 ... sN)`   | `IrCall`          |
-| `(closure index)`          | `IrClosure`       |
+| `(call sc s1 s2 ... sN)`   | `IrCall`          |
+| `(closure c)`              | `IrClosure`       |
 | `(rec e)`                  | `IrRec`           |
 
 ### Tail calls
@@ -187,8 +188,8 @@ In fact, there's an easy addition we might as well make:
 | Form                          | Type              |
 |-------------------------------|-------------------|
 | ...                           | ...               |
-| `(call sf s1 s2 ... sN)`      | `IrCall`          |
-| `(tail-call sf s1 s2 ... sN)` | `IrTailCall`      |
+| `(call sc s1 s2 ... sN)`      | `IrCall`          |
+| `(tail-call sc s1 s2 ... sN)` | `IrTailCall`      |
 | ...                           | ...               |
 
 The `tail-call` opcode is then used in _tail-call position_, which is defined

@@ -9,6 +9,7 @@ export type Ir =
     | IrJump
     | IrSetSlot
     | IrCall
+    | IrTailCall
     | IrClosure
     | IrRec;
 
@@ -57,14 +58,22 @@ export class IrSetSlot {
 
 export class IrCall {
     constructor(
-        public funcSlotIndex: number,
+        public closureSlotIndex: number,
+        public argSlotIndices: Array<number>,
+    ) {
+    }
+}
+
+export class IrTailCall {
+    constructor(
+        public closureSlotIndex: number,
         public argSlotIndices: Array<number>,
     ) {
     }
 }
 
 export class IrClosure {
-    constructor(public closureIndex: number) {
+    constructor(public funcSlotIndex: number) {
     }
 }
 
