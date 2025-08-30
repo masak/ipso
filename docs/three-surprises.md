@@ -1,3 +1,5 @@
+> _Graham is able to explain Lisp using only seven primitive operators, two different notations for functions, and a half-dozen higher-level functions defined in terms of the primitive operators. That Lisp can be specified by such a small sequence of basic rules no doubt contributes to its mystique._ &mdash; Two-Bit History, [How Lisp Became God's Own Programming Language](https://twobithistory.org/2018/10/14/lisp.html)
+
 # Three surprises on the way to the interpreter
 
 Reynolds warns in his "Definitional Interpreters" that it's very easy for
