@@ -32,7 +32,8 @@ See [docs/three-surprises.md](./docs/three-surprises.md).
 We take things in two big steps. The first, compiling to an intermediate
 representation. This makes some statically known or inferrable things clear
 in the code, and breaks it down into smaller steps. It's also straightforward
-to flatten the intermediate representation to bytecode later.
+to flatten the intermediate representation to bytecode later &mdash; that is
+the second step.
 
 ### Variable lookup
 
@@ -197,7 +198,7 @@ inductively as follows:
 * If an `if` expression is in tail-call position, then both its "then" branch
   expression and its "else" branch expression are also in tail-call position.
 
-Semantivally, a tail call eliminates the need to return to the current function
+Semantically, a tail call eliminates the need to return to the current function
 activation after the function call to `sf` completes. Instead, we can return
 immediately to the current function's caller. In other words, tail calls can
 act more like "go to" instructions, because they give all the benefits of a
