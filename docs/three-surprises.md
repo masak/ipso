@@ -2,7 +2,7 @@
 
 # Three surprises on the way to the interpreter
 
-Reynolds warns in his "Definitional Interpreters" that it's very easy for
+Reynolds warns in his "Definitional Interpreters" that it's easy for
 features of the implementing language to "leak through" into the language
 or interpreter being implemented. The risk is especially high when you're
 using something like Common Lisp as the metalanguage; you might be using
